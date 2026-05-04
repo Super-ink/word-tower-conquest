@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>词塔征服 · Word Tower Conquest</title>
+<style>
+@font-face {
+  font-family: 'PixelFont';
+  src: url('data:font/woff2;base64,') format('woff2');
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #1a1a2e;
+  --panel: #16213e;
+  --accent: #e94560;
+  --gold: #f5c518;
+  --green: #4ecca3;
+  --blue: #0f9b8e;
+  --text: #eaeaea;
+  --muted: #7f8c8d;
+  --hp: #e74c3c;
+  --mp: #3498db;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  height: 100vh;
+  image-rendering: pixelated;
+}
+canvas { display: none; }
+
+/* ===== PIXEL ART ENGINE (CSS sprites) ===== */
+.pixel-sprite {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ===== SCREENS ===== */
+.screen { display:none; width:100%; height:100vh; position:absolute; top:0; left:0; }
+.screen.active { display:flex; }
+
+/* Title Screen */
+#title-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #0f0c29, #302b63, #24243e);
+}
+.title-logo {
+  font-size: 48px;
+  color: var(--gold);
+  text-shadow: 4px 4px 0 #b8860b, 0 0 20px rgba(245,197,24,0.5);
+  margin-bottom: 8px;
+  letter-spacing: 4px;
+  animation: titlePulse 2s ease-in-out infinite;
+}
+@keyframes titlePulse {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+.title-sub {
+  font-size: 18px;
+  color: var(--muted);
+  margin-bottom: 40px;
+  letter-spacing: 2px;
+}
+.pixel-btn {
+  background: var(--accent);
+  color: #fff;
+  border: 3px solid #c0392b;
+  padding: 12px 36px;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow: 4px 4px 0 #7f1d1d;
+}
+.pixel-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #7f1d1d;
+}
+.pixel-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 #7f1d1d;
+}
+.pixel-btn.green { background: var(--green); border-color: #2d8a6e; box-shadow: 4px 4px 0 #1a5c47; }
+.pixel-btn.green:hover { box-shadow: 2px 2px 0 #1a5c47; }
+.pixel-btn.blue { background: var(--blue); border-color: #0a6e65; box-shadow: 4px 4px 0 #054d47; }
+.pixel-btn.gold { background: var(--gold); color: #1a1a2e; border-color: #b8860b; box-shadow: 4px 4px 0 #8b6914; }
+.pixel-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+/* HUD */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.6);
+  border-bottom: 3px solid #333;
+  font-size: 14px;
+  z-index: 10;
+}
+.hud-left, .hud-right { display:flex; gap:16px; align-items:center; }
+.hud-item { display:flex; align-items:center; gap:4px; }
+.hud-icon { font-size:16px; }
+.hp-bar, .exp-bar {
+  width: 120px; height: 14px;
+  background: #333;
+  border: 2px solid #555;
+  position: relative;
+  overflow: hidden;
+}
+.hp-bar .fill {
+  height: 100%;
+  background: linear-gradient(180deg, #e74c3c, #c0392b);
+  transition: width 0.3s;
+}
+.exp-bar .fill {
+  height: 100%;
+  background: linear-gradient(180deg, #f5c518, #d4a017);
+  transition: width 0.3s;
+}
+.bar-text {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* Map Screen */
+#map-screen {
+  flex-direction: column;
+}
+.map-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+.map-title {
+  font-size: 20px;
+  color: var(--gold);
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 0 #333;
+}
+.map-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+}
+.map-row {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+.map-node {
+  width: 72px; height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #444;
+  background: #222;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  font-size: 28px;
+}
+.map-node:hover { border-color: var(--gold); transform: scale(1.1); }
+.map-node.locked { opacity:0.3; cursor:not-allowed; }
+.map-node.locked:hover { transform:none; border-color:#444; }
+.map-node.current { border-color: var(--gold); box-shadow: 0 0 12px rgba(245,197,24,0.4); animation: nodePulse 1.5s ease-in-out infinite; }
+.map-node.visited { opacity:0.5; border-color:#555; }
+.map-node-label { font-size:9px; color:var(--muted); margin-top:2px; }
+@keyframes nodePulse {
+  0%,100% { box-shadow: 0 0 12px rgba(245,197,24,0.4); }
+  50% { box-shadow: 0 0 20px rgba(245,197,24,0.8); }
+}
+.map-legend {
+  display: flex; gap: 16px; margin-top: 20px; font-size: 12px; color: var(--muted);
+}
+.map-legend span { display:flex; align-items:center; gap:4px; }
+
+/* Battle Screen */
+#battle-screen {
+  flex-direction: column;
+}
+.battle-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  position: relative;
+}
+.battle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.enemy-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.enemy-sprite {
+  width: 80px; height: 80px;
+  background: #2a1a3e;
+  border: 3px solid #6a3093;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  position: relative;
+}
+.enemy-hp-bar {
+  width: 150px; height: 16px;
+  background: #333;
+  border: 2px solid #555;
+  position: relative;
+}
+.enemy-hp-bar .fill {
+  height: 100%;
+  background: linear-gradient(180deg, #9b59b6, #8e44ad);
+  transition: width 0.3s;
+}
+.enemy-name {
+  font-size: 16px;
+  color: #c39bd3;
+  margin-bottom: 4px;
+}
+.timer-bar {
+  width: 100%;
+  height: 20px;
+  background: #333;
+  border: 2px solid #555;
+  margin-bottom: 12px;
+  position: relative;
+}
+.timer-bar .fill {
+  height: 100%;
+  background: linear-gradient(180deg, #2ecc71, #27ae60);
+  transition: width 0.1s linear;
+}
+.timer-bar.warning .fill { background: linear-gradient(180deg, #e67e22, #d35400); }
+.timer-bar.danger .fill { background: linear-gradient(180deg, #e74c3c, #c0392b); }
+.timer-text {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #fff; text-shadow: 1px 1px 0 #000;
+}
+
+.match-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 10px 0;
+}
+.match-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 180px;
+}
+.match-card {
+  padding: 12px 16px;
+  background: #1e2a4a;
+  border: 3px solid #3a506b;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 16px;
+  text-align: center;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+.match-card:hover { border-color: var(--blue); background: #253556; }
+.match-card.selected { border-color: var(--gold); background: #2a3a5c; box-shadow: 0 0 10px rgba(245,197,24,0.3); }
+.match-card.correct { border-color: var(--green); background: #1a3a2a; }
+.match-card.wrong { border-color: var(--accent); background: #3a1a1a; }
+.match-card.matched { opacity:0.3; pointer-events:none; }
+
+.battle-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* Rest Screen */
+#rest-screen {
+  flex-direction: column;
+}
+.rest-area {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+.rest-title {
+  font-size: 24px;
+  color: var(--green);
+  text-align: center;
+  margin-bottom: 20px;
+}
+.rest-options {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.rest-option {
+  background: #1e2a4a;
+  border: 3px solid #3a506b;
+  padding: 16px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  min-width: 140px;
+}
+.rest-option:hover { border-color: var(--green); transform: translateY(-2px); }
+.rest-option .icon { font-size: 28px; margin-bottom: 8px; }
+.rest-option .label { font-size: 14px; }
+
+.deck-view {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.deck-view.show { display:flex; }
+.deck-card {
+  padding: 8px 12px;
+  background: #1e2a4a;
+  border: 2px solid #3a506b;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.deck-card:hover { border-color: var(--gold); }
+.deck-card.selected { border-color: var(--accent); background: #3a1a2a; }
+.master-confirm {
+  display: none;
+  text-align: center;
+  margin-top: 12px;
+}
+.master-confirm.show { display:block; }
+
+/* Event Screen */
+#event-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.event-panel {
+  background: #1e2a4a;
+  border: 3px solid #6a3093;
+  padding: 32px;
+  max-width: 500px;
+  text-align: center;
+}
+.event-icon { font-size: 48px; margin-bottom: 16px; }
+.event-title { font-size: 20px; color: #c39bd3; margin-bottom: 12px; }
+.event-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+.event-choices { display: flex; flex-direction: column; gap: 8px; }
+.event-choice {
+  padding: 10px 16px;
+  background: #16213e;
+  border: 2px solid #3a506b;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 14px;
+  text-align: left;
+}
+.event-choice:hover { border-color: var(--gold); }
+
+/* Reward Screen */
+#reward-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.reward-panel {
+  background: #1e2a4a;
+  border: 3px solid var(--gold);
+  padding: 32px;
+  max-width: 560px;
+  text-align: center;
+}
+.reward-title { font-size: 20px; color: var(--gold); margin-bottom: 16px; }
+.reward-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.reward-card {
+  padding: 12px 16px;
+  background: #16213e;
+  border: 3px solid #3a506b;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 120px;
+}
+.reward-card:hover { border-color: var(--green); }
+.reward-card.selected { border-color: var(--green); background: #1a3a2a; }
+.reward-card .word { font-size: 16px; color: var(--text); }
+.reward-card .meaning { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.reward-info { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+/* Quiz overlay */
+.quiz-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.quiz-overlay.show { display:flex; }
+.quiz-panel {
+  background: #1e2a4a;
+  border: 3px solid var(--accent);
+  padding: 32px;
+  max-width: 480px;
+  text-align: center;
+}
+.quiz-title { font-size: 18px; color: var(--accent); margin-bottom: 16px; }
+.quiz-word { font-size: 32px; color: var(--gold); margin-bottom: 8px; }
+.quiz-hint { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+.quiz-input {
+  background: #16213e;
+  border: 2px solid #3a506b;
+  color: var(--text);
+  padding: 10px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 16px;
+  outline: none;
+}
+.quiz-input:focus { border-color: var(--gold); }
+.quiz-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.quiz-opt {
+  padding: 10px;
+  background: #16213e;
+  border: 2px solid #3a506b;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.quiz-opt:hover { border-color: var(--gold); }
+.quiz-opt.correct { border-color: var(--green); background: #1a3a2a; }
+.quiz-opt.wrong { border-color: var(--accent); background: #3a1a1a; }
+.quiz-result { font-size: 16px; margin-top: 12px; }
+
+/* Game Over / Victory */
+#gameover-screen, #victory-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.go-panel {
+  background: #1e2a4a;
+  border: 3px solid var(--accent);
+  padding: 40px;
+  text-align: center;
+}
+.vic-panel {
+  background: #1e2a4a;
+  border: 3px solid var(--gold);
+  padding: 40px;
+  text-align: center;
+}
+.go-title { font-size: 36px; color: var(--accent); margin-bottom: 12px; }
+.vic-title { font-size: 36px; color: var(--gold); margin-bottom: 12px; }
+.go-stats, .vic-stats { font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 2; }
+
+/* Floating damage */
+.float-dmg {
+  position: absolute;
+  font-size: 24px;
+  font-weight: bold;
+  pointer-events: none;
+  animation: floatUp 1s ease-out forwards;
+  z-index: 50;
+  text-shadow: 2px 2px 0 #000;
+}
+.float-dmg.damage { color: var(--accent); }
+.float-dmg.heal { color: var(--green); }
+.float-dmg.perfect { color: var(--gold); font-size: 30px; }
+@keyframes floatUp {
+  0% { opacity:1; transform: translateY(0); }
+  100% { opacity:0; transform: translateY(-60px); }
+}
+
+/* Log */
+.battle-log {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--gold);
+  border: 2px solid #444;
+  white-space: nowrap;
+  z-index: 20;
+  transition: opacity 0.3s;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #444; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .title-logo { font-size: 28px; }
+  .match-area { gap: 16px; }
+  .match-card { font-size: 13px; padding: 8px 10px; }
+  .map-node { width: 56px; height: 56px; font-size: 22px; }
+}
+
+/* Transition effect */
+.screen-transition {
+  animation: screenFade 0.4s ease;
+}
+@keyframes screenFade {
+  0% { opacity:0; transform: scale(0.95); }
+  100% { opacity:1; transform: scale(1); }
+}
+
+/* Mastered words panel */
+.mastered-panel {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: #16213e;
+  border: 2px solid #2d6a4f;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.mastered-panel.show { display:block; }
+.mastered-panel h3 { color: var(--green); font-size: 14px; margin-bottom: 8px; }
+.mastered-word { display:inline-block; padding: 2px 8px; margin: 2px; background:#1a3a2a; border:1px solid #2d6a4f; font-size:11px; color:var(--green); }
+
+/* Boss special */
+.enemy-sprite.boss { 
+  border-color: #e74c3c; 
+  box-shadow: 0 0 20px rgba(231,76,60,0.4);
+  animation: bossGlow 1.5s ease-in-out infinite;
+}
+@keyframes bossGlow {
+  0%,100% { box-shadow: 0 0 20px rgba(231,76,60,0.4); }
+  50% { box-shadow: 0 0 30px rgba(231,76,60,0.8); }
+}
+
+/* Deck browse */
+.deck-browse {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 100;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+.deck-browse.show { display:flex; }
+.deck-browse h2 { color: var(--gold); margin-bottom: 16px; }
+.deck-browse-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 600px;
+}
+.deck-browse-card {
+  padding: 10px 14px;
+  background: #1e2a4a;
+  border: 2px solid #3a506b;
+  min-width: 100px;
+  text-align: center;
+}
+.deck-browse-card .en { font-size: 14px; color: var(--text); }
+.deck-browse-card .cn { font-size: 11px; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Title Screen -->
+<div id="title-screen" class="screen active">
+  <div style="text-align:center">
+    <div style="font-size:80px;margin-bottom:8px">🏰</div>
+    <div class="title-logo">词塔征服</div>
+    <div class="title-sub">WORD TOWER CONQUEST</div>
+    <div style="margin-bottom:32px;font-size:13px;color:var(--muted);line-height:1.8">
+      爬塔战斗 · 记忆单词 · 永久掌握<br>
+      <span style="color:var(--gold)">⚔️ 连线战斗</span> · <span style="color:var(--green)">📖 学习成长</span> · <span style="color:var(--accent)">💀 Boss挑战</span>
+    </div>
+    <button class="pixel-btn" onclick="startGame()">开始征服</button>
+    <div style="margin-top:16px;font-size:11px;color:#555">WASD/方向键 移动 · 鼠标点击选择</div>
+  </div>
+</div>
+
+<!-- Map Screen -->
+<div id="map-screen" class="screen">
+  <div class="hud" id="map-hud"></div>
+  <div class="map-container">
+    <div class="map-title" id="map-title">第一层 · 基础词汇</div>
+    <div class="map-grid" id="map-grid"></div>
+    <div class="map-legend">
+      <span>⚔️ 战斗</span>
+      <span>🔥 休息</span>
+      <span>❓ 事件</span>
+      <span>💀 Boss</span>
+    </div>
+  </div>
+</div>
+
+<!-- Battle Screen -->
+<div id="battle-screen" class="screen">
+  <div class="hud" id="battle-hud"></div>
+  <div class="battle-area" id="battle-area">
+    <div class="battle-header">
+      <div class="enemy-panel">
+        <div class="enemy-sprite" id="enemy-sprite">👹</div>
+        <div>
+          <div class="enemy-name" id="enemy-name">单词守卫</div>
+          <div class="enemy-hp-bar"><div class="fill" id="enemy-hp-fill" style="width:100%"></div><div class="bar-text" id="enemy-hp-text">100/100</div></div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;color:var(--muted)" id="battle-round">回合 1</div>
+        <div style="font-size:11px;color:#555" id="deck-count">牌库: 20</div>
+      </div>
+    </div>
+    <div class="timer-bar" id="timer-bar"><div class="fill" id="timer-fill" style="width:100%"></div><div class="timer-text" id="timer-text">15s</div></div>
+    <div class="match-area" id="match-area">
+      <div class="match-column" id="eng-col"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <div style="font-size:24px">⟷</div>
+        <div style="font-size:11px;color:var(--muted)" id="match-count">已连线: 0/5</div>
+      </div>
+      <div class="match-column" id="chn-col"></div>
+    </div>
+    <div class="battle-log" id="battle-log"></div>
+    <div class="battle-actions">
+      <button class="pixel-btn green" id="btn-confirm" onclick="confirmMatch()" disabled>确认连线</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rest Screen -->
+<div id="rest-screen" class="screen">
+  <div class="hud" id="rest-hud"></div>
+  <div class="rest-area">
+    <div class="rest-title">🔥 休息营地</div>
+    <div class="rest-options">
+      <div class="rest-option" onclick="restHeal()">
+        <div class="icon">❤️</div>
+        <div class="label">回复 30% 生命</div>
+      </div>
+      <div class="rest-option" onclick="toggleDeckView()">
+        <div class="icon">📖</div>
+        <div class="label">翻阅牌库</div>
+      </div>
+      <div class="rest-option" onclick="toggleMasterView()">
+        <div class="icon">🧠</div>
+        <div class="label">掌握单词</div>
+      </div>
+      <div class="rest-option" onclick="leaveRest()">
+        <div class="icon">➡️</div>
+        <div class="label">继续前进</div>
+      </div>
+    </div>
+    <div class="deck-view" id="deck-view"></div>
+    <div class="deck-view" id="master-view"></div>
+    <div class="master-confirm" id="master-confirm">
+      <button class="pixel-btn green" onclick="confirmMaster()">确认掌握 (<span id="master-count">0</span> 词)</button>
+    </div>
+    <div class="mastered-panel" id="mastered-panel">
+      <h3>✅ 已掌握词库</h3>
+      <div id="mastered-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Event Screen -->
+<div id="event-screen" class="screen">
+  <div class="hud" id="event-hud"></div>
+  <div class="event-panel" id="event-panel"></div>
+</div>
+
+<!-- Reward Screen -->
+<div id="reward-screen" class="screen">
+  <div class="reward-panel" id="reward-panel"></div>
+</div>
+
+<!-- Quiz Overlay -->
+<div class="quiz-overlay" id="quiz-overlay">
+  <div class="quiz-panel" id="quiz-panel"></div>
+</div>
+
+<!-- Deck Browse -->
+<div class="deck-browse" id="deck-browse">
+  <h2>📖 当前牌库</h2>
+  <div class="deck-browse-grid" id="deck-browse-grid"></div>
+  <button class="pixel-btn" onclick="closeDeckBrowse()" style="margin-top:16px;font-size:13px;padding:8px 20px">关闭</button>
+</div>
+
+<!-- Game Over -->
+<div id="gameover-screen" class="screen">
+  <div class="go-panel">
+    <div class="go-title">💀 征服失败</div>
+    <div class="go-stats" id="go-stats"></div>
+    <button class="pixel-btn" onclick="startGame()">再次挑战</button>
+  </div>
+</div>
+
+<!-- Victory -->
+<div id="victory-screen" class="screen">
+  <div class="vic-panel">
+    <div class="vic-title">🏆 征服成功!</div>
+    <div class="vic-stats" id="vic-stats"></div>
+    <button class="pixel-btn gold" onclick="startGame()">新的征程</button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// WORD DATABASE
+// ==========================================
+const WORD_POOLS = {
+  // Level 1: CET-4 basics
+  1: [
+    {en:"abandon",cn:"放弃"},{en:"ability",cn:"能力"},{en:"absorb",cn:"吸收"},{en:"abstract",cn:"抽象的"},
+    {en:"academic",cn:"学术的"},{en:"accelerate",cn:"加速"},{en:"accept",cn:"接受"},{en:"access",cn:"进入；访问"},
+    {en:"accomplish",cn:"完成"},{en:"accurate",cn:"精确的"},{en:"achieve",cn:"实现"},{en:"acknowledge",cn:"承认"},
+    {en:"acquire",cn:"获得"},{en:"adapt",cn:"适应"},{en:"adequate",cn:"足够的"},{en:"adjust",cn:"调整"},
+    {en:"admire",cn:"钦佩"},{en:"admit",cn:"承认"},{en:"adopt",cn:"采用"},{en:"advance",cn:"前进"},
+    {en:"advantage",cn:"优势"},{en:"adventure",cn:"冒险"},{en:"affect",cn:"影响"},{en:"afford",cn:"负担得起"},
+    {en:"aggressive",cn:"侵略性的"},{en:"agriculture",cn:"农业"},{en:"allocate",cn:"分配"},{en:"alternative",cn:"替代的"},
+    {en:"amateur",cn:"业余的"},{en:"ambition",cn:"野心"},{en:"amount",cn:"数量"},{en:"analyse",cn:"分析"},
+    {en:"ancestor",cn:"祖先"},{en:"ancient",cn:"古代的"},{en:"announce",cn:"宣布"},{en:"annual",cn:"年度的"},
+    {en:"anxiety",cn:"焦虑"},{en:"apparent",cn:"明显的"},{en:"appeal",cn:"呼吁"},{en:"appetite",cn:"食欲"},
+    {en:"approach",cn:"接近"},{en:"appropriate",cn:"适当的"},{en:"approve",cn:"批准"},{en:"arise",cn:"出现"},
+    {en:"arrange",cn:"安排"},{en:"artificial",cn:"人工的"},{en:"assess",cn:"评估"},{en:"assign",cn:"分配"},
+    {en:"assist",cn:"协助"},{en:"associate",cn:"联系"},{en:"assume",cn:"假设"},{en:"atmosphere",cn:"气氛"},
+    {en:"attach",cn:"附上"},{en:"attempt",cn:"尝试"},{en:"attitude",cn:"态度"},{en:"attract",cn:"吸引"},
+    {en:"authority",cn:"权威"},{en:"available",cn:"可用的"},{en:"aware",cn:"意识到的"},{en:"balance",cn:"平衡"},
+    {en:"barrier",cn:"障碍"},{en:"basic",cn:"基本的"},{en:"behalf",cn:"代表"},{en:"behave",cn:"行为"},
+    {en:"benefit",cn:"利益"},{en:"blame",cn:"责备"},{en:"blank",cn:"空白的"},{en:"blend",cn:"混合"},
+    {en:"block",cn:"阻塞"},{en:"boost",cn:"促进"},{en:"boundary",cn:"边界"},{en:"brand",cn:"品牌"},
+    {en:"brilliant",cn:"辉煌的"},{en:"broadcast",cn:"广播"},{en:"budget",cn:"预算"},{en:"burden",cn:"负担"},
+    {en:"calculate",cn:"计算"},{en:"campaign",cn:"运动"},{en:"capable",cn:"有能力的"},{en:"capacity",cn:"容量"},
+    {en:"capture",cn:"捕获"},{en:"casual",cn:"随意的"},{en:"category",cn:"类别"},{en:"celebrate",cn:"庆祝"},
+    {en:"ceremony",cn:"仪式"},{en:"challenge",cn:"挑战"},{en:"channel",cn:"频道"},{en:"chapter",cn:"章节"},
+    {en:"character",cn:"角色"},{en:"charity",cn:"慈善"},{en:"chemical",cn:"化学的"},{en:"circumstance",cn:"情况"},
+    {en:"citizen",cn:"公民"},{en:"civil",cn:"民事的"},{en:"clarify",cn:"澄清"},{en:"classic",cn:"经典的"},
+    {en:"climate",cn:"气候"},{en:"clinical",cn:"临床的"},{en:"colleague",cn:"同事"},{en:"combine",cn:"结合"},
+    {en:"command",cn:"命令"},{en:"comment",cn:"评论"},{en:"commercial",cn:"商业的"},{en:"commission",cn:"委员会"},
+    {en:"commit",cn:"犯；承诺"},{en:"communicate",cn:"沟通"},{en:"community",cn:"社区"},{en:"compare",cn:"比较"},
+    {en:"compete",cn:"竞争"},{en:"complex",cn:"复杂的"},{en:"component",cn:"组件"},{en:"compose",cn:"组成"},
+    {en:"comprehend",cn:"理解"},{en:"concentrate",cn:"集中"},{en:"concept",cn:"概念"},{en:"concern",cn:"关心"},
+    {en:"conclude",cn:"总结"},{en:"conduct",cn:"进行"},{en:"conference",cn:"会议"},{en:"confess",cn:"承认"},
+    {en:"confidence",cn:"信心"},{en:"confirm",cn:"确认"},{en:"conflict",cn:"冲突"},{en:"confuse",cn:"困惑"},
+    {en:"connect",cn:"连接"},{en:"conscious",cn:"有意识的"},{en:"consensus",cn:"共识"},{en:"consequence",cn:"后果"},
+    {en:"conservative",cn:"保守的"},{en:"consider",cn:"考虑"},{en:"consist",cn:"由...组成"},{en:"constant",cn:"恒定的"},
+    {en:"construct",cn:"建造"},{en:"consult",cn:"咨询"},{en:"consume",cn:"消耗"},{en:"contact",cn:"接触"},
+    {en:"contain",cn:"包含"},{en:"contemporary",cn:"当代的"},{en:"content",cn:"内容"},{en:"contest",cn:"竞赛"},
+    {en:"context",cn:"上下文"},{en:"contract",cn:"合同"},{en:"contribute",cn:"贡献"},{en:"control",cn:"控制"},
+    {en:"controversial",cn:"有争议的"},{en:"convenient",cn:"方便的"},{en:"conventional",cn:"传统的"},{en:"convince",cn:"说服"},
+    {en:"cooperate",cn:"合作"},{en:"cope",cn:"应对"},{en:"corporate",cn:"公司的"},{en:"correct",cn:"正确的"},
+    {en:"correspond",cn:"对应"},{en:"costly",cn:"昂贵的"},{en:"council",cn:"委员会"},{en:"count",cn:"计数"},
+    {en:"courage",cn:"勇气"},{en:"crash",cn:"碰撞"},{en:"create",cn:"创造"},{en:"creative",cn:"创造性的"},
+    {en:"credit",cn:"信用"},{en:"criminal",cn:"犯罪的"},{en:"crisis",cn:"危机"},{en:"critical",cn:"关键的"},
+    {en:"crucial",cn:"至关重要的"},{en:"cultivate",cn:"培养"},{en:"currency",cn:"货币"},{en:"curriculum",cn:"课程"},
+    {en:"customer",cn:"顾客"},{en:"debate",cn:"辩论"},{en:"decade",cn:"十年"},{en:"deceive",cn:"欺骗"},
+    {en:"declare",cn:"宣布"},{en:"decline",cn:"下降"},{en:"decorate",cn:"装饰"},{en:"decrease",cn:"减少"},
+    {en:"defeat",cn:"击败"},{en:"defend",cn:"防御"},{en:"define",cn:"定义"},{en:"definite",cn:"明确的"},
+    {en:"delay",cn:"延迟"},{en:"deliberate",cn:"故意的"},{en:"delicate",cn:"精致的"},{en:"deliver",cn:"交付"},
+    {en:"demand",cn:"需求"},{en:"demonstrate",cn:"演示"},{en:"deny",cn:"否认"},{en:"depart",cn:"离开"},
+    {en:"depend",cn:"依赖"},{en:"deposit",cn:"存款"},{en:"depress",cn:"使沮丧"},{en:"derive",cn:"源自"},
+    {en:"describe",cn:"描述"},{en:"desert",cn:"沙漠"},{en:"deserve",cn:"值得"},{en:"design",cn:"设计"},
+    {en:"desire",cn:"渴望"},{en:"desperate",cn:"绝望的"},{en:"despite",cn:"尽管"},{en:"destination",cn:"目的地"},
+    {en:"detect",cn:"检测"},{en:"determine",cn:"确定"},{en:"develop",cn:"发展"},{en:"device",cn:"设备"},
+    {en:"devote",cn:"奉献"},{en:"diagnosis",cn:"诊断"},{en:"differ",cn:"不同"},{en:"digest",cn:"消化"},
+    {en:"dilemma",cn:"困境"},{en:"dimension",cn:"维度"},{en:"diminish",cn:"减少"},{en:"diplomat",cn:"外交官"},
+    {en:"disaster",cn:"灾难"},{en:"discipline",cn:"纪律"},{en:"discount",cn:"折扣"},{en:"discover",cn:"发现"},
+    {en:"discriminate",cn:"歧视"},{en:"disguise",cn:"伪装"},{en:"dismiss",cn:"解雇"},{en:"disorder",cn:"混乱"},
+    {en:"display",cn:"展示"},{en:"distinguish",cn:"区分"},{en:"distribute",cn:"分配"},{en:"disturb",cn:"打扰"},
+    {en:"diverse",cn:"多样的"},{en:"document",cn:"文件"},{en:"domestic",cn:"国内的"},{en:"dominant",cn:"主导的"},
+    {en:"donate",cn:"捐赠"},{en:"dramatic",cn:"戏剧性的"},{en:"duration",cn:"持续时间"},{en:"dynamic",cn:"动态的"},
+  ],
+  // Level 2: CET-6 / intermediate
+  2: [
+    {en:"abolish",cn:"废除"},{en:"abrupt",cn:"突然的"},{en:"abstain",cn:"戒除"},{en:"accommodate",cn:"容纳"},
+    {en:"accumulate",cn:"积累"},{en:"accusation",cn:"指控"},{en:"adhere",cn:"坚持"},{en:"adjacent",cn:"邻近的"},
+    {en:"administer",cn:"管理"},{en:"advocate",cn:"提倡"},{en:"affiliate",cn:"附属"},{en:"aggregate",cn:"总计"},
+    {en:"agitate",cn:"煽动"},{en:"allegation",cn:"指控"},{en:"alleviate",cn:"减轻"},{en:"ambiguous",cn:"模棱两可的"},
+    {en:"amend",cn:"修正"},{en:"amplify",cn:"放大"},{en:"analogy",cn:"类比"},{en:"anticipate",cn:"预期"},
+    {en:"apparatus",cn:"装置"},{en:"apprehend",cn:"逮捕"},{en:"apt",cn:"恰当的"},{en:"arbitrary",cn:"任意的"},
+    {en:"articulate",cn:"清晰表达"},{en:"aspire",cn:"渴望"},{en:"assert",cn:"断言"},{en:"asylum",cn:"庇护所"},
+    {en:"attorney",cn:"律师"},{en:"authentic",cn:"真实的"},{en:"authorize",cn:"授权"},{en:"autonomy",cn:"自治"},
+    {en:"avert",cn:"避免"},{en:"baffle",cn:"使困惑"},{en:"bankrupt",cn:"破产的"},{en:"benign",cn:"良性的"},
+    {en:"bizarre",cn:"奇异的"},{en:"blaze",cn:"火焰"},{en:"bless",cn:"祝福"},{en:"blunder",cn:"大错"},
+    {en:"bolster",cn:"支持"},{en:"brace",cn:"支撑"},{en:"breach",cn:"违反"},{en:"brisk",cn:"轻快的"},
+    {en:"brochure",cn:"小册子"},{en:"browse",cn:"浏览"},{en:"bruise",cn:"瘀伤"},{en:"bureaucracy",cn:"官僚主义"},
+    {en:"cascade",cn:"级联"},{en:"casualty",cn:"伤亡"},{en:"catalog",cn:"目录"},{en:"catastrophe",cn:"灾难"},
+    {en:"chronic",cn:"慢性的"},{en:"circulate",cn:"循环"},{en:"civic",cn:"公民的"},{en:"clan",cn:"氏族"},
+    {en:"cluster",cn:"集群"},{en:"coalition",cn:"联盟"},{en:"cognitive",cn:"认知的"},{en:"coherent",cn:"连贯的"},
+    {en:"coincide",cn:"巧合"},{en:"collaborate",cn:"合作"},{en:"commemorate",cn:"纪念"},{en:"commence",cn:"开始"},
+    {en:"commend",cn:"表扬"},{en:"compact",cn:"紧凑的"},{en:"compatible",cn:"兼容的"},{en:"compel",cn:"强迫"},
+    {en:"compile",cn:"编译"},{en:"complement",cn:"补充"},{en:"comply",cn:"遵守"},{en:"comprise",cn:"包含"},
+    {en:"compromise",cn:"妥协"},{en:"compulsory",cn:"强制的"},{en:"conceal",cn:"隐藏"},{en:"concede",cn:"承认"},
+    {en:"conceive",cn:"构想"},{en:"condemn",cn:"谴责"},{en:"confine",cn:"限制"},{en:"conform",cn:"遵守"},
+    {en:"confront",cn:"面对"},{en:"congregate",cn:"聚集"},{en:"conquest",cn:"征服"},{en:"consent",cn:"同意"},
+    {en:"conserve",cn:"保存"},{en:"consolidate",cn:"巩固"},{en:"conspiracy",cn:"阴谋"},{en:"constitute",cn:"构成"},
+    {en:"constrain",cn:"约束"},{en:"consul",cn:"领事"},{en:"contaminate",cn:"污染"},{en:"contemplate",cn:"沉思"},
+    {en:"contempt",cn:"蔑视"},{en:"contend",cn:"竞争"},{en:"contradict",cn:"矛盾"},{en:"controversy",cn:"争论"},
+    {en:"convene",cn:"召集"},{en:"converge",cn:"汇聚"},{en:"convert",cn:"转换"},{en:"convey",cn:"传达"},
+    {en:"convict",cn:"定罪"},{en:"cooperative",cn:"合作的"},{en:"correlate",cn:"相关"},{en:"correspondent",cn:"记者"},
+    {en:"corrode",cn:"腐蚀"},{en:"counterpart",cn:"对应物"},{en:"coup",cn:"政变"},{en:"courtesy",cn:"礼貌"},
+    {en:"credential",cn:"资格"},{en:"cripple",cn:"使残废"},{en:"criterion",cn:"标准"},{en:"critique",cn:"批评"},
+    {en:"crude",cn:"粗糙的"},{en:"cumulative",cn:"累积的"},{en:"curb",cn:"抑制"},{en:"curtail",cn:"削减"},
+    {en:"cynical",cn:"愤世嫉俗的"},{en:"daunting",cn:"令人畏惧的"},{en:"dazzle",cn:"使目眩"},{en:"debut",cn:"首次亮相"},
+    {en:"decent",cn:"体面的"},{en:"decisive",cn:"决定性的"},{en:"dedicate",cn:"奉献"},{en:"deem",cn:"认为"},
+    {en:"default",cn:"默认"},{en:"deficit",cn:"赤字"},{en:"defy",cn:"违抗"},{en:"delegate",cn:"委托"},
+    {en:"deliberately",cn:"故意地"},{en:"denounce",cn:"谴责"},{en:"depict",cn:"描绘"},{en:"deploy",cn:"部署"},
+    {en:"deprive",cn:"剥夺"},{en:"depute",cn:"委派"},{en:"descend",cn:"下降"},{en:"designate",cn:"指定"},
+    {en:"detach",cn:"分离"},{en:"detain",cn:"拘留"},{en:"deteriorate",cn:"恶化"},{en:"deviate",cn:"偏离"},
+    {en:"diagnose",cn:"诊断"},{en:"differentiate",cn:"区分"},{en:"dilute",cn:"稀释"},{en:"discard",cn:"丢弃"},
+    {en:"disclose",cn:"披露"},{en:"discourse",cn:"话语"},{en:"discrepancy",cn:"差异"},{en:"discrete",cn:"离散的"},
+    {en:"disperse",cn:"分散"},{en:"displace",cn:"取代"},{en:"dispose",cn:"处置"},{en:"disregard",cn:"无视"},
+    {en:"disrupt",cn:"破坏"},{en:"dissolve",cn:"溶解"},{en:"distort",cn:"扭曲"},{en:"distress",cn:"苦恼"},
+    {en:"divert",cn:"转移"},{en:"divine",cn:"神圣的"},{en:"doctrine",cn:"学说"},{en:"domain",cn:"领域"},
+    {en:"donor",cn:"捐赠者"},{en:"doom",cn:"厄运"},{en:"drain",cn:"排水"},{en:"drastic",cn:"激烈的"},
+    {en:"dread",cn:"恐惧"},{en:"drought",cn:"干旱"},{en:"dub",cn:"配音"},{en:"duplicate",cn:"复制"},
+    {en:"dwell",cn:"居住"},{en:"eccentric",cn:"古怪的"},{en:"eclipse",cn:"日食"},{en:"eject",cn:"弹出"},
+    {en:"elaborate",cn:"精心制作"},{en:"eligible",cn:"有资格的"},{en:"eliminate",cn:"消除"},{en:"elite",cn:"精英"},
+    {en:"eloquent",cn:"雄辩的"},{en:"embody",cn:"体现"},{en:"embrace",cn:"拥抱"},{en:"emerge",cn:"出现"},
+    {en:"emit",cn:"发出"},{en:"empirical",cn:"经验的"},{en:"encompass",cn:"包含"},{en:"encounter",cn:"遇到"},
+    {en:"endorse",cn:"赞同"},{en:"endure",cn:"忍受"},{en:"enforce",cn:"执行"},{en:"engage",cn:"参与"},
+    {en:"enhance",cn:"增强"},{en:"enlighten",cn:"启发"},{en:"enrich",cn:"丰富"},{en:"enroll",cn:"注册"},
+    {en:"ensue",cn:"接着发生"},{en:"entail",cn:"需要"},{en:"enterprise",cn:"企业"},{en:"enthusiastic",cn:"热情的"},
+    {en:"entity",cn:"实体"},{en:"entrepreneur",cn:"企业家"},{en:"envisage",cn:"设想"},{en:"epidemic",cn:"流行病"},
+    {en:"equivalent",cn:"等价的"},{en:"era",cn:"时代"},{en:"erode",cn:"侵蚀"},{en:"erroneous",cn:"错误的"},
+    {en:"erupt",cn:"爆发"},{en:"escort",cn:"护送"},{en:"essence",cn:"本质"},{en:"esteem",cn:"尊重"},
+    {en:"evacuate",cn:"疏散"},{en:"evaluate",cn:"评估"},{en:"evoke",cn:"唤起"},{en:"exaggerate",cn:"夸大"},
+    {en:"exceed",cn:"超过"},{en:"excerpt",cn:"摘录"},{en:"excess",cn:"过量"},{en:"exclusive",cn:"排他的"},
+    {en:"execute",cn:"执行"},{en:"exempt",cn:"豁免"},{en:"exert",cn:"施加"},{en:"exile",cn:"流放"},
+    {en:"exotic",cn:"异国的"},{en:"explicit",cn:"明确的"},{en:"exploit",cn:"开发"},{en:"expose",cn:"暴露"},
+    {en:"exterior",cn:"外部的"},{en:"external",cn:"外部的"},{en:"extract",cn:"提取"},{en:"fabricate",cn:"制造"},
+    {en:"facet",cn:"方面"},{en:"facilitate",cn:"促进"},{en:"faction",cn:"派系"},{en:"fatal",cn:"致命的"},
+    {en:"fatigue",cn:"疲劳"},{en:"feat",cn:"壮举"},{en:"federal",cn:"联邦的"},{en:"fertile",cn:"肥沃的"},
+    {en:"fiscal",cn:"财政的"},{en:"fixture",cn:"固定装置"},{en:"flank",cn:"侧面"},{en:"flaw",cn:"缺陷"},
+    {en:"flee",cn:"逃跑"},{en:"fling",cn:"投掷"},{en:"fluctuate",cn:"波动"},{en:"flourish",cn:"繁荣"},
+    {en:"flush",cn:"冲洗"},{en:"folklore",cn:"民间传说"},{en:"forecast",cn:"预测"},{en:"forge",cn:"锻造"},
+    {en:"formidable",cn:"强大的"},{en:"formulate",cn:"制定"},{en:"foster",cn:"培养"},{en:"fraction",cn:"分数"},
+    {en:"fragile",cn:"脆弱的"},{en:"fragrance",cn:"香味"},{en:"framework",cn:"框架"},{en:"friction",cn:"摩擦"},
+    {en:"fringe",cn:"边缘"},{en:"frustrate",cn:"挫败"},{en:"fulfill",cn:"实现"},{en:"fundamental",cn:"基本的"},
+  ],
+  // Level 3: GRE / advanced
+  3: [
+    {en:"aberration",cn:"偏差"},{en:"abscond",cn:"潜逃"},{en:"abstemious",cn:"节制的"},{en:"acerbic",cn:"尖刻的"},
+    {en:"acumen",cn:"敏锐"},{en:"admonish",cn:"告诫"},{en:"aesthetic",cn:"审美的"},{en:"affable",cn:"和蔼的"},
+    {en:"affluent",cn:"富裕的"},{en:"alacrity",cn:"敏捷"},{en:"allocate",cn:"分配"},{en:"altruistic",cn:"利他的"},
+    {en:"ambivalent",cn:"矛盾的"},{en:"ameliorate",cn:"改善"},{en:"anachronistic",cn:"时代错误的"},{en:"analogous",cn:"类似的"},
+    {en:"anomaly",cn:"异常"},{en:"antipathy",cn:"反感"},{en:"apathy",cn:"冷漠"},{en:"appease",cn:"安抚"},
+    {en:"archaic",cn:"过时的"},{en:"arduous",cn:"艰巨的"},{en:"articulate",cn:"善于表达的"},{en:"ascetic",cn:"禁欲的"},
+    {en:"assiduous",cn:"勤奋的"},{en:"astute",cn:"精明的"},{en:"audacious",cn:"大胆的"},{en:"austere",cn:"朴素的"},
+    {en:"avarice",cn:"贪婪"},{en:"aversion",cn:"厌恶"},{en:"banal",cn:"平庸的"},{en:"belligerent",cn:"好战的"},
+    {en:"beneficent",cn:"仁慈的"},{en:"benevolent",cn:"善意的"},{en:"berate",cn:"严厉指责"},{en:"bolster",cn:"支持"},
+    {en:"bombastic",cn:"浮夸的"},{en:"bourgeois",cn:"资产阶级的"},{en:"brevity",cn:"简洁"},{en:"bucolic",cn:"田园的"},
+    {en:"bumptious",cn:"自大的"},{en:"cacophony",cn:"刺耳的声音"},{en:"cajole",cn:"哄骗"},{en:"calumny",cn:"诽谤"},
+    {en:"candid",cn:"坦率的"},{en:"capricious",cn:"反复无常的"},{en:"castigate",cn:"惩罚"},{en:"catalyst",cn:"催化剂"},
+    {en:"caustic",cn:"腐蚀性的"},{en:"censure",cn:"谴责"},{en:"cerebral",cn:"大脑的"},{en:"charlatan",cn:"江湖骗子"},
+    {en:"chicanery",cn:"诡辩"},{en:"circumscribe",cn:"限制"},{en:"circumvent",cn:"规避"},{en:"clandestine",cn:"秘密的"},
+    {en:"clemency",cn:"仁慈"},{en:"coerce",cn:"胁迫"},{en:"cogent",cn:"令人信服的"},{en:"collateral",cn:"抵押品"},
+    {en:"commensurate",cn:"相称的"},{en:"compelling",cn:"引人注目的"},{en:"complacent",cn:"自满的"},{en:"compliant",cn:"顺从的"},
+    {en:"concomitant",cn:"伴随的"},{en:"conducive",cn:"有利于的"},{en:"congenial",cn:"意气相投的"},{en:"conjecture",cn:"推测"},
+    {en:"connive",cn:"共谋"},{en:"consecrate",cn:"奉献"},{en:"conspicuous",cn:"显眼的"},{en:"contentious",cn:"有争议的"},
+    {en:"contrite",cn:"悔恨的"},{en:"conundrum",cn:"难题"},{en:"conventional",cn:"传统的"},{en:"copious",cn:"大量的"},
+    {en:"corroborate",cn:"证实"},{en:"cosmopolitan",cn:"世界性的"},{en:"credulous",cn:"轻信的"},{en:"cryptic",cn:"神秘的"},
+    {en:"culminate",cn:"达到高潮"},{en:"culpable",cn:"有罪的"},{en:"curtail",cn:"削减"},{en:"dearth",cn:"缺乏"},
+    {en:"debilitate",cn:"使衰弱"},{en:"decorum",cn:"礼仪"},{en:"deference",cn:"尊重"},{en:"deleterious",cn:"有害的"},
+    {en:"delineate",cn:"描绘"},{en:"demagogue",cn:"煽动者"},{en:"denigrate",cn:"诋毁"},{en:"deplete",cn:"消耗"},
+    {en:"deprecate",cn:"反对"},{en:"deride",cn:"嘲笑"},{en:"derivative",cn:"衍生的"},{en:"desultory",cn:"散漫的"},
+    {en:"detrimental",cn:"有害的"},{en:"diatribe",cn:"抨击"},{en:"didactic",cn:"说教的"},{en:"diffident",cn:"缺乏自信的"},
+    {en:"digress",cn:"离题"},{en:"dilatory",cn:"拖延的"},{en:"disaffected",cn:"不满的"},{en:"discerning",cn:"有洞察力的"},
+    {en:"disparage",cn:"贬低"},{en:"disparate",cn:"不同的"},{en:"disseminate",cn:"传播"},{en:"dissent",cn:"异议"},
+    {en:"dissolution",cn:"溶解"},{en:"dissonance",cn:"不和谐"},{en:"dogmatic",cn:"教条的"},{en:"dormant",cn:"休眠的"},
+    {en:"dubious",cn:"可疑的"},{en:"ebullient",cn:"热情洋溢的"},{en:"eclectic",cn:"折衷的"},{en:"effervescent",cn:"热情的"},
+    {en:"efficacious",cn:"有效的"},{en:"egregious",cn:"极坏的"},{en:"elicit",cn:"引出"},{en:"eloquent",cn:"雄辩的"},
+    {en:"emancipate",cn:"解放"},{en:"embellish",cn:"装饰"},{en:"empathy",cn:"同理心"},{en:"empirical",cn:"经验主义的"},
+    {en:"emulate",cn:"模仿"},{en:"endemic",cn:"地方性的"},{en:"engender",cn:"引起"},{en:"enigma",cn:"谜"},
+    {en:"ennui",cn:"厌倦"},{en:"ephemeral",cn:"短暂的"},{en:"equanimity",cn:"平静"},{en:"equivocal",cn:"模棱两可的"},
+    {en:"erudite",cn:"博学的"},{en:"esoteric",cn:"深奥的"},{en:"espouse",cn:"支持"},{en:"euphemism",cn:"委婉语"},
+    {en:"exacerbate",cn:"加剧"},{en:"exalt",cn:"赞扬"},{en:"exasperate",cn:"激怒"},{en:"exemplary",cn:"模范的"},
+    {en:"exhaustive",cn:"详尽的"},{en:"exonerate",cn:"免除"},{en:"expedient",cn:"权宜的"},{en:"expedite",cn:"加速"},
+    {en:"explicit",cn:"明确的"},{en:"exploitative",cn:"剥削的"},{en:"exponential",cn:"指数的"},{en:"expunge",cn:"删除"},
+    {en:"extenuate",cn:"减轻"},{en:"extraneous",cn:"无关的"},{en:"extravagant",cn:"奢侈的"},{en:"facetious",cn:"滑稽的"},
+    {en:"fallacious",cn:"谬误的"},{en:"fastidious",cn:"挑剔的"},{en:"fathom",cn:"理解"},{en:"fervent",cn:"热情的"},
+    {en:"flagrant",cn:"公然的"},{en:"florid",cn:"华丽的"},{en:"foment",cn:"煽动"},{en:"forestall",cn:"预先阻止"},
+    {en:"fortuitous",cn:"偶然的"},{en:"frivolous",cn:"轻浮的"},{en:"frugal",cn:"节俭的"},{en:"furtive",cn:"鬼鬼祟祟的"},
+    {en:"futile",cn:"徒劳的"},{en:"garrulous",cn:"话多的"},{en:"gratuitous",cn:"无端的"},{en:"gregarious",cn:"合群的"},
+    {en:"hackneyed",cn:"陈腐的"},{en:"hapless",cn:"不幸的"},{en:"harangue",cn:"长篇大论"},{en:"harbinger",cn:"先兆"},
+    {en:"hegemony",cn:"霸权"},{en:"heresy",cn:"异端"},{en:"iconoclast",cn:"偶像破坏者"},{en:"idiosyncratic",cn:"特殊的"},
+    {en:"ignominious",cn:"耻辱的"},{en:"immutable",cn:"不可变的"},{en:"impede",cn:"阻碍"},{en:"imperious",cn:"专横的"},
+    {en:"impervious",cn:"不受影响的"},{en:"impetuous",cn:"冲动的"},{en:"implacable",cn:"不可安抚的"},{en:"implicit",cn:"含蓄的"},
+    {en:"importune",cn:"纠缠"},{en:"impregnable",cn:"坚不可摧的"},{en:"impromptu",cn:"即兴的"},{en:"impudent",cn:"无礼的"},
+    {en:"impugn",cn:"质疑"},{en:"incisive",cn:"深刻的"},{en:"incongruous",cn:"不协调的"},{en:"incorporate",cn:"合并"},
+    {en:"indifferent",cn:"冷漠的"},{en:"indigenous",cn:"本地的"},{en:"indignant",cn:"愤慨的"},{en:"indolent",cn:"懒惰的"},
+    {en:"ineludible",cn:"不可避免的"},{en:"inexorable",cn:"不可阻挡的"},{en:"ingenious",cn:"巧妙的"},{en:"ingenuous",cn:"天真的"},
+    {en:"inherent",cn:"固有的"},{en:"innocuous",cn:"无害的"},{en:"inscrutable",cn:"高深莫测的"},{en:"insipid",cn:"乏味的"},
+    {en:"insolent",cn:"傲慢的"},{en:"insurgent",cn:"叛乱的"},{en:"intangible",cn:"无形的"},{en:"integral",cn:"完整的"},
+    {en:"intransigent",cn:"不妥协的"},{en:"intrepid",cn:"无畏的"},{en:"inundate",cn:"淹没"},{en:"invective",cn:"辱骂"},
+    {en:"inveterate",cn:"根深蒂固的"},{en:"irascible",cn:"易怒的"},{en:"irreverent",cn:"不敬的"},{en:"itinerant",cn:"巡回的"},
+    {en:"jubilant",cn:"欢欣鼓舞的"},{en:"judicious",cn:"明智的"},{en:"laconic",cn:"简洁的"},{en:"lament",cn:"哀叹"},
+    {en:"languid",cn:"无精打采的"},{en:"laudable",cn:"值得赞扬的"},{en:"lethargic",cn:"昏昏欲睡的"},{en:"levity",cn:"轻浮"},
+    {en:"loquacious",cn:"话多的"},{en:"lucid",cn:"清晰的"},{en:"magnanimous",cn:"宽宏大量的"},{en:"malevolent",cn:"恶毒的"},
+    {en:"malleable",cn:"可塑的"},{en:"mundane",cn:"平凡的"},{en:"munificent",cn:"慷慨的"},{en:"myriad",cn:"无数的"},
+    {en:"nefarious",cn:"邪恶的"},{en:"nonchalant",cn:"冷淡的"},{en:"nostalgia",cn:"怀旧"},{en:"notorious",cn:"臭名昭著的"},
+    {en:"novice",cn:"新手"},{en:"nuance",cn:"细微差别"},{en:"obdurate",cn:"顽固的"},{en:"obfuscate",cn:"使模糊"},
+    {en:"oblique",cn:"间接的"},{en:"oblivious",cn:"遗忘的"},{en:"obscure",cn:"模糊的"},{en:"obsequious",cn:"谄媚的"},
+    {en:"obsolete",cn:"过时的"},{en:"obstinate",cn:"固执的"},{en:"obtuse",cn:"迟钝的"},{en:"onerous",cn:"繁重的"},
+    {en:"opaque",cn:"不透明的"},{en:"opportunist",cn:"机会主义者"},{en:"opulent",cn:"富裕的"},{en:"ornate",cn:"华丽的"},
+    {en:"orthodox",cn:"正统的"},{en:"ostentatious",cn:"炫耀的"},{en:"pacify",cn:"平息"},{en:"paradigm",cn:"范式"},
+    {en:"paradox",cn:"悖论"},{en:"paragon",cn:"典范"},{en:"parsimonious",cn:"吝啬的"},{en:"partisan",cn:"党派的"},
+    {en:"patronize",cn:"光顾"},{en:"paucity",cn:"少量"},{en:"pedantic",cn:"学究式的"},{en:"penchant",cn:"嗜好"},
+    {en:"penitent",cn:"忏悔的"},{en:"perfunctory",cn:"敷衍的"},{en:"pernicious",cn:"有害的"},{en:"perpetuate",cn:"使永久化"},
+    {en:"perspicacious",cn:"敏锐的"},{en:"pertinent",cn:"相关的"},{en:"peruse",cn:"细读"},{en:"pervasive",cn:"普遍的"},
+    {en:"petulant",cn:"暴躁的"},{en:"philanthropy",cn:"慈善"},{en:"phlegmatic",cn:"冷漠的"},{en:"placate",cn:"安抚"},
+    {en:"platitude",cn:"陈词滥调"},{en:"plausible",cn:"貌似合理的"},{en:"plethora",cn:"过多"},{en:"polemical",cn:"好争论的"},
+    {en:"pragmatic",cn:"务实的"},{en:"precarious",cn:"不稳定的"},{en:"precedent",cn:"先例"},{en:"precipitate",cn:"促成"},
+    {en:"precocious",cn:"早熟的"},{en:"predilection",cn:"偏爱"},{en:"preeminent",cn:"卓越的"},{en:"prescient",cn:"有先见之明的"},
+    {en:"presumptuous",cn:"放肆的"},{en:"prevalent",cn:"流行的"},{en:"pristine",cn:"原始的"},{en:"probity",cn:"正直"},
+    {en:"proliferate",cn:"扩散"},{en:"prolific",cn:"多产的"},{en:"propensity",cn:"倾向"},{en:"propitious",cn:"吉利的"},
+    {en:"propriety",cn:"得体"},{en:"proscribe",cn:"禁止"},{en:"prosaic",cn:"乏味的"},{en:"providence",cn:"天意"},
+    {en:"provocative",cn:"挑衅的"},{en:"prudent",cn:"谨慎的"},{en:"pugnacious",cn:"好斗的"},{en:"punctilious",cn:"一丝不苟的"},
+    {en:"punitive",cn:"惩罚性的"},{en:"quandary",cn:"困境"},{en:"querulous",cn:"爱抱怨的"},{en:"quiescent",cn:"静止的"},
+    {en:"quintessential",cn:"典型的"},{en:"raconteur",cn:"善于讲故事的人"},{en:"rancorous",cn:"怨恨的"},{en:"rationalize",cn:"合理化"},
+    {en:"rebuke",cn:"指责"},{en:"recalcitrant",cn:"顽抗的"},{en:"recant",cn:"撤回"},{en:"reciprocate",cn:"回报"},
+    {en:"recluse",cn:"隐士"},{en:"rectify",cn:"纠正"},{en:"redolent",cn:"芬芳的"},{en:"redundant",cn:"多余的"},
+    {en:"refute",cn:"反驳"},{en:"relegate",cn:"降级"},{en:"remorse",cn:"懊悔"},{en:"renounce",cn:"放弃"},
+    {en:"replete",cn:"充满的"},{en:"reprehensible",cn:"应受谴责的"},{en:"repudiate",cn:"拒绝"},{en:"requisite",cn:"必要的"},
+    {en:"rescind",cn:"撤销"},{en:"resilient",cn:"有弹性的"},{en:"resolute",cn:"坚决的"},{en:"reticent",cn:"沉默寡言的"},
+    {en:"revere",cn:"尊敬"},{en:"rhetoric",cn:"修辞"},{en:"ruminate",cn:"沉思"},{en:"rustic",cn:"乡村的"},
+    {en:"sagacious",cn:"睿智的"},{en:"salient",cn:"突出的"},{en:"sanction",cn:"制裁"},{en:"sanguine",cn:"乐观的"},
+    {en:"sardonic",cn:"讽刺的"},{en:"scrupulous",cn:"一丝不苟的"},{en:"scrutinize",cn:"仔细审查"},{en:"surreptitious",cn:"秘密的"},
+    {en:"sycophant",cn:"马屁精"},{en:"tacit",cn:"默示的"},{en:"taciturn",cn:"沉默寡言的"},{en:"tangential",cn:"离题的"},
+    {en:"temerity",cn:"鲁莽"},{en:"tenacious",cn:"顽强的"},{en:"tenuous",cn:"脆弱的"},{en:"transient",cn:"短暂的"},
+    {en:"trepidation",cn:"恐惧"},{en:"truculent",cn:"好斗的"},{en:"ubiquitous",cn:"无处不在的"},{en:"unctuous",cn:"油腔滑调的"},
+    {en:"undermine",cn:"破坏"},{en:"unequivocal",cn:"明确的"},{en:"unprecedented",cn:"史无前例的"},{en:"untenable",cn:"站不住脚的"},
+    {en:"upbraid",cn:"责骂"},{en:"urbane",cn:"温文尔雅的"},{en:"usurp",cn:"篡夺"},{en:"utilitarian",cn:"功利的"},
+    {en:"vacillate",cn:"犹豫"},{en:"venerate",cn:"尊敬"},{en:"veracity",cn:"真实性"},{en:"verbose",cn:"冗长的"},
+    {en:"vestige",cn:"遗迹"},{en:"viable",cn:"可行的"},{en:"vicarious",cn:"间接的"},{en:"vigilant",cn:"警惕的"},
+    {en:"vilify",cn:"诽谤"},{en:"vindicate",cn:"证明"},{en:"vindictive",cn:"怀恨的"},{en:"virulent",cn:"恶毒的"},
+    {en:"visceral",cn:"发自肺腑的"},{en:"vitriolic",cn:"尖刻的"},{en:"vociferous",cn:"大声的"},{en:"volatile",cn:"易变的"},
+    {en:"voracious",cn:"贪婪的"},{en:"vulnerable",cn:"脆弱的"},{en:"wanton",cn:"肆意的"},{en:"whimsical",cn:"异想天开的"},
+    {en:"zealous",cn:"热心的"},{en:"zenith",cn:"顶点"}
+  ]
+};
+
+const ENEMIES = [
+  {name:"词汇史莱姆",emoji:"🟢",hp:60,atk:8,pairs:5,sprite:"╲╲╲╱╱╱"},
+  {name:"语法蝙蝠",emoji:"🦇",hp:80,atk:12,pairs:5,sprite:"∧∧∧∧∧∧"},
+  {name:"拼写幽灵",emoji:"👻",hp:70,atk:10,pairs:5,sprite:"◯◯◯◯◯"},
+  {name:"阅读石像",emoji:"🗿",hp:100,atk:15,pairs:5,sprite:"▓▓▓▓▓"},
+  {name:"听力魔眼",emoji:"👁️",hp:90,atk:14,pairs:5,sprite:"◎◎◎◎"},
+  {name:"词根藤蔓",emoji:"🌿",hp:75,atk:11,pairs:5,sprite:"~~~~~"},
+  {name:"完形傀儡",emoji:"🪆",hp:85,atk:13,pairs:5,sprite:"▌▐▌▐▌"},
+  {name:"翻译术士",emoji:"🧙",hp:95,atk:14,pairs:5,sprite:"△▽△▽"},
+];
+const BOSSES = [
+  {name:"四级魔王",emoji:"👹",hp:200,atk:20,pairs:8,sprite:"▓▓▓▓▓▓▓"},
+  {name:"六级暴君",emoji:"🐉",hp:300,atk:28,pairs:8,sprite:"███████"},
+  {name:"考研终焉",emoji:"💀",hp:400,atk:35,pairs:8,sprite:"▊▊▊▊▊▊"},
+];
+const EVENTS = [
+  {
+    name:"博学者石碑",emoji:"🪨",
+    desc:'一座刻满铭文的古老石碑出现在你面前。碑上写着一个缺少单词的英文句子，你需要从4个选项中选择正确的词。',
+    type:"scholar",
+  },
+  {
+    name:"词根之泉",emoji:"⛲",
+    desc:'一泓散发着微光的泉水。传说饮下泉水的人能洞察词根的奥秘。从3个词根中选择一个，本层所有包含该词根的单词连线正确时伤害+20%。',
+    type:"fountain",
+  },
+  {
+    name:"记忆之赌",emoji:"🎰",
+    desc:'一个神秘的赌桌浮现。赌注是你的记忆——展示3张牌库中的单词卡，10秒后隐去英文，凭记忆拼出其中一个。成功获得奖励，失败则受罚。',
+    type:"gamble",
+  },
+  {
+    name:"遗忘药水",emoji:"🧪",
+    desc:'你发现了一瓶闪烁着紫色光芒的药水。标签上写着「遗忘」——饮用后可以随机遗忘牌库中2个单词（永久移除），但你会失去10%的生命。',
+    type:"potion",
+  },
+  {
+    name:"神秘商人",emoji:"🧳",
+    desc:'一个戴着面具的商人从阴影中走出。「我有好东西，用你的记忆来换……」他提供3张高级单词卡，但你必须接受一次额外考核。',
+    type:"merchant",
+  },
+];
+
+// ==========================================
+// GAME STATE
+// ==========================================
+let G = {};
+
+function initState() {
+  G = {
+    hp: 100, maxHp: 100,
+    atk: 15,
+    floor: 1,
+    currentRow: 0,
+    currentCol: -1,
+    deck: [],           // current word deck
+    mastered: [],       // permanently mastered words
+    pendingMaster: [],  // words awaiting quiz
+    tempBuffs: [],      // temporary buffs from mastering
+    permBuffs: [],      // permanent buffs from passed quizzes
+    map: [],
+    visited: [],
+    round: 0,
+    score: 0,
+    wordsEncountered: 0,
+    perfectMatches: 0,
+    totalMatches: 0,
+    restUsed: false,
+    bonusTime: 0,
+    extraErrorForgive: 0,
+    floorWordLevel: 1,
+  };
+  // Generate initial deck
+  generateDeck(20);
+  generateMap();
+}
+
+function generateDeck(count) {
+  const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+  const used = new Set(G.deck.map(w=>w.en).concat(G.mastered.map(w=>w.en)));
+  const available = pool.filter(w => !used.has(w.en));
+  const shuffled = shuffle([...available]);
+  for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+    G.deck.push(shuffled[i]);
+  }
+}
+
+function generateMap() {
+  const cols = 5 + Math.floor(Math.random() * 3); // 5-7 columns
+  G.map = [];
+  for (let r = 0; r < 3; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      let type;
+      if (c === cols - 1) {
+        type = 'boss';
+      } else if (c === 0) {
+        type = 'battle';
+      } else {
+        const rand = Math.random();
+        if (rand < 0.45) type = 'battle';
+        else if (rand < 0.65) type = 'rest';
+        else if (rand < 0.85) type = 'event';
+        else type = 'battle';
+      }
+      row.push({ type, visited: false });
+    }
+    G.map.push(row);
+  }
+  G.currentRow = 1; // start middle
+  G.currentCol = -1;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ==========================================
+// SCREEN MANAGEMENT
+// ==========================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  el.classList.add('active', 'screen-transition');
+  setTimeout(() => el.classList.remove('screen-transition'), 400);
+}
+
+// ==========================================
+// HUD
+// ==========================================
+function renderHud(containerId) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = `
+    <div class="hud-left">
+      <div class="hud-item"><span class="hud-icon">❤️</span>
+        <div class="hp-bar"><div class="fill" style="width:${(G.hp/G.maxHp*100)}%"></div><div class="bar-text">${G.hp}/${G.maxHp}</div></div>
+      </div>
+      <div class="hud-item"><span class="hud-icon">⚔️</span> ${G.atk}</div>
+      <div class="hud-item"><span class="hud-icon">🏰</span> 第${G.floor}层</div>
+    </div>
+    <div class="hud-right">
+      <div class="hud-item"><span class="hud-icon">📚</span> 牌库:${G.deck.length}</div>
+      <div class="hud-item"><span class="hud-icon">✅</span> 掌握:${G.mastered.length}</div>
+      <div class="hud-item"><span class="hud-icon">⭐</span> ${G.score}</div>
+    </div>
+  `;
+}
+
+// ==========================================
+// START GAME
+// ==========================================
+function startGame() {
+  initState();
+  showMapScreen();
+}
+
+function showMapScreen() {
+  renderHud('map-hud');
+  document.getElementById('map-title').textContent = `第${G.floor}层 · ${['基础词汇','进阶词汇','高级词汇'][G.floor-1]||'终极词汇'}`;
+  renderMap();
+  showScreen('map-screen');
+}
+
+function renderMap() {
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = '';
+  const icons = { battle:'⚔️', rest:'🔥', event:'❓', boss:'💀' };
+  const labels = { battle:'战斗', rest:'休息', event:'事件', boss:'Boss' };
+
+  for (let r = 0; r < 3; r++) {
+    const row = document.createElement('div');
+    row.className = 'map-row';
+    for (let c = 0; c < G.map[r].length; c++) {
+      const node = G.map[r][c];
+      const el = document.createElement('div');
+      el.className = 'map-node';
+      
+      const isCurrent = (r === G.currentRow && c === G.currentCol);
+      const isNext = (c === G.currentCol + 1 && Math.abs(r - G.currentRow) <= 1);
+      const isVisited = node.visited;
+      
+      if (isCurrent) el.classList.add('current');
+      else if (isVisited) el.classList.add('visited');
+      else if (!isNext) el.classList.add('locked');
+      
+      el.innerHTML = `<span>${icons[node.type]}</span><div class="map-node-label">${labels[node.type]}</div>`;
+      
+      if (isNext) {
+        el.onclick = () => enterNode(r, c);
+      }
+      row.appendChild(el);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function enterNode(row, col) {
+  G.currentRow = row;
+  G.currentCol = col;
+  G.map[row][col].visited = true;
+  G.restUsed = false;
+  G.round = 0;
+  
+  const node = G.map[row][col];
+  switch(node.type) {
+    case 'battle': startBattle(false); break;
+    case 'rest': showRestScreen(); break;
+    case 'event': showEventScreen(); break;
+    case 'boss': startBattle(true); break;
+  }
+}
+
+// ==========================================
+// BATTLE SYSTEM
+// ==========================================
+let battleState = {};
+
+function startBattle(isBoss) {
+  const enemies = isBoss ? BOSSES : ENEMIES;
+  const enemy = isBoss ? 
+    BOSSES[Math.min(G.floor - 1, BOSSES.length - 1)] :
+    ENEMIES[Math.floor(Math.random() * ENEMIES.length)];
+  
+  // Scale enemy
+  const scaleFactor = 1 + (G.floor - 1) * 0.3;
+  
+  battleState = {
+    enemy: {
+      ...enemy,
+      hp: Math.floor(enemy.hp * scaleFactor),
+      maxHp: Math.floor(enemy.hp * scaleFactor),
+      atk: Math.floor(enemy.atk * scaleFactor),
+      pairs: isBoss ? 8 : 5,
+    },
+    isBoss,
+    round: ++G.round,
+    timeLeft: 15 + G.bonusTime,
+    timer: null,
+    selectedEng: null,
+    selectedChn: null,
+    matches: [],
+    matchCount: 0,
+    correctCount: 0,
+    wrongCount: 0,
+    battleCards: [],
+    answered: false,
+  };
+  
+  // Pick words for this battle
+  const deck = [...G.deck];
+  if (deck.length === 0) {
+    // No words left, auto win
+    endBattle(true);
+    return;
+  }
+  const count = Math.min(battleState.enemy.pairs, deck.length);
+  const picked = shuffle(deck).slice(0, count);
+  battleState.battleCards = picked;
+  battleState.enemy.pairs = count;
+  
+  renderBattleScreen();
+  showScreen('battle-screen');
+  startTimer();
+}
+
+function renderBattleScreen() {
+  renderHud('battle-hud');
+  const e = battleState.enemy;
+  
+  document.getElementById('enemy-sprite').textContent = e.emoji;
+  document.getElementById('enemy-sprite').className = battleState.isBoss ? 'enemy-sprite boss' : 'enemy-sprite';
+  document.getElementById('enemy-name').textContent = e.name + (battleState.isBoss ? ' 👑' : '');
+  document.getElementById('enemy-hp-fill').style.width = (e.hp / e.maxHp * 100) + '%';
+  document.getElementById('enemy-hp-text').textContent = `${e.hp}/${e.maxHp}`;
+  document.getElementById('battle-round').textContent = `回合 ${battleState.round}`;
+  document.getElementById('deck-count').textContent = `牌库: ${G.deck.length}`;
+  
+  renderMatchCards();
+  updateMatchCount();
+}
+
+function renderMatchCards() {
+  const engCol = document.getElementById('eng-col');
+  const chnCol = document.getElementById('chn-col');
+  engCol.innerHTML = '';
+  chnCol.innerHTML = '';
+  
+  const words = battleState.battleCards;
+  const engOrder = shuffle([...words]);
+  const chnOrder = shuffle([...words]);
+  
+  engOrder.forEach((w, i) => {
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.textContent = w.en;
+    card.dataset.word = w.en;
+    card.dataset.side = 'eng';
+    card.onclick = () => selectCard(card, 'eng', w.en);
+    engCol.appendChild(card);
+  });
+  
+  chnOrder.forEach((w, i) => {
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.textContent = w.cn;
+    card.dataset.word = w.en;
+    card.dataset.side = 'chn';
+    card.onclick = () => selectCard(card, 'chn', w.en);
+    chnCol.appendChild(card);
+  });
+}
+
+function selectCard(card, side, word) {
+  if (card.classList.contains('matched')) return;
+  
+  // Deselect same side
+  document.querySelectorAll(`.match-card[data-side="${side}"]`).forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  
+  if (side === 'eng') battleState.selectedEng = word;
+  else battleState.selectedChn = word;
+  
+  // Check if both selected
+  if (battleState.selectedEng && battleState.selectedChn) {
+    checkMatch();
+  }
+}
+
+function checkMatch() {
+  const eng = battleState.selectedEng;
+  const chn = battleState.selectedChn;
+  
+  const engCards = document.querySelectorAll('.match-card[data-side="eng"]');
+  const chnCards = document.querySelectorAll('.match-card[data-side="chn"]');
+  
+  const engCard = [...engCards].find(c => c.dataset.word === eng && c.classList.contains('selected'));
+  const chnCard = [...chnCards].find(c => c.dataset.word === chn && c.classList.contains('selected'));
+  
+  if (eng === chn) {
+    // Correct match
+    engCard.classList.remove('selected');
+    chnCard.classList.remove('selected');
+    engCard.classList.add('correct');
+    chnCard.classList.add('correct');
+    setTimeout(() => {
+      engCard.classList.add('matched');
+      chnCard.classList.add('matched');
+    }, 300);
+    battleState.matchCount++;
+    battleState.correctCount++;
+    battleState.matches.push(eng);
+    
+    // Damage
+    let dmg = G.atk;
+    // Apply buffs
+    G.permBuffs.concat(G.tempBuffs).forEach(b => {
+      if (b.type === 'atk') dmg += b.value;
+    });
+    
+    const isPerfect = battleState.matchCount === battleState.battleCards.length && battleState.wrongCount === 0;
+    if (isPerfect) {
+      dmg *= 2;
+      showFloatDmg('💥 完美连线! ×2', 'perfect');
+      G.perfectMatches++;
+    }
+    
+    battleState.enemy.hp = Math.max(0, battleState.enemy.hp - dmg);
+    showFloatDmg(`-${dmg}`, 'damage');
+    G.totalMatches++;
+    G.wordsEncountered++;
+    
+    showLog(`✅ ${eng} 正确! 造成 ${dmg} 伤害`);
+  } else {
+    // Wrong match
+    engCard.classList.remove('selected');
+    chnCard.classList.remove('selected');
+    engCard.classList.add('wrong');
+    chnCard.classList.add('wrong');
+    setTimeout(() => {
+      engCard.classList.remove('wrong');
+      chnCard.classList.remove('wrong');
+    }, 500);
+    battleState.wrongCount++;
+    
+    showLog(`❌ ${eng} ≠ ${chn}`);
+  }
+  
+  battleState.selectedEng = null;
+  battleState.selectedChn = null;
+  updateMatchCount();
+  updateEnemyHp();
+  updateMatchCountDisplay();
+  
+  // Check if all matched
+  if (battleState.matchCount >= battleState.battleCards.length) {
+    setTimeout(() => endBattleRound(), 600);
+  }
+}
+
+function updateEnemyHp() {
+  const e = battleState.enemy;
+  document.getElementById('enemy-hp-fill').style.width = (e.hp / e.maxHp * 100) + '%';
+  document.getElementById('enemy-hp-text').textContent = `${e.hp}/${e.maxHp}`;
+}
+
+function updateMatchCount() {
+  document.getElementById('btn-confirm').disabled = battleState.matchCount === 0;
+}
+
+function updateMatchCountDisplay() {
+  document.getElementById('match-count').textContent = `已连线: ${battleState.matchCount}/${battleState.battleCards.length}`;
+}
+
+function startTimer() {
+  const totalTime = 15 + G.bonusTime;
+  battleState.timeLeft = totalTime;
+  updateTimerDisplay();
+  
+  battleState.timer = setInterval(() => {
+    battleState.timeLeft -= 0.1;
+    if (battleState.timeLeft <= 0) {
+      battleState.timeLeft = 0;
+      clearInterval(battleState.timer);
+      endBattleRound();
+    }
+    updateTimerDisplay();
+  }, 100);
+}
+
+function updateTimerDisplay() {
+  const pct = battleState.timeLeft / (15 + G.bonusTime) * 100;
+  document.getElementById('timer-fill').style.width = pct + '%';
+  document.getElementById('timer-text').textContent = Math.ceil(battleState.timeLeft) + 's';
+  
+  const bar = document.getElementById('timer-bar');
+  bar.className = 'timer-bar';
+  if (pct < 25) bar.classList.add('danger');
+  else if (pct < 50) bar.classList.add('warning');
+}
+
+function endBattleRound() {
+  clearInterval(battleState.timer);
+  battleState.answered = true;
+  
+  const e = battleState.enemy;
+  if (e.hp <= 0) {
+    endBattle(true);
+    return;
+  }
+  
+  // Enemy attacks
+  let enemyDmg = e.atk;
+  // Extra damage for wrong matches
+  enemyDmg += battleState.wrongCount * 3;
+  // Forgive errors if buff active
+  if (G.extraErrorForgive > 0) {
+    enemyDmg = Math.max(0, enemyDmg - battleState.wrongCount * 3);
+    G.extraErrorForgive--;
+  }
+  
+  G.hp = Math.max(0, G.hp - enemyDmg);
+  showFloatDmg(`-${enemyDmg}`, 'damage');
+  showLog(`${e.name} 发动攻击! 造成 ${enemyDmg} 伤害`);
+  
+  renderHud('battle-hud');
+  
+  if (G.hp <= 0) {
+    setTimeout(() => gameOver(), 800);
+    return;
+  }
+  
+  // Next round
+  setTimeout(() => {
+    if (e.hp > 0) {
+      startBattleRound();
+    }
+  }, 1200);
+}
+
+function startBattleRound() {
+  battleState.round++;
+  battleState.selectedEng = null;
+  battleState.selectedChn = null;
+  battleState.matchCount = 0;
+  battleState.correctCount = 0;
+  battleState.wrongCount = 0;
+  battleState.matches = [];
+  battleState.answered = false;
+  
+  // Pick new cards
+  const available = G.deck.filter(w => !battleState.battleCards.some(b => b.en === w.en));
+  if (available.length < battleState.enemy.pairs) {
+    // Not enough unique words, reuse
+    battleState.battleCards = shuffle([...G.deck]).slice(0, battleState.enemy.pairs);
+  } else {
+    battleState.battleCards = shuffle([...available]).slice(0, battleState.enemy.pairs);
+  }
+  
+  renderBattleScreen();
+  startTimer();
+}
+
+function confirmMatch() {
+  if (battleState.answered) return;
+  clearInterval(battleState.timer);
+  endBattleRound();
+}
+
+function endBattle(won) {
+  clearInterval(battleState.timer);
+  if (won) {
+    G.score += battleState.isBoss ? 100 : 30;
+    showLog('🎉 战斗胜利!');
+    
+    if (battleState.isBoss) {
+      // Advance floor
+      if (G.floor >= 3) {
+        showVictory();
+        return;
+      }
+      G.floor++;
+      G.floorWordLevel = Math.min(G.floor, 3);
+      generateDeck(5);
+      generateMap();
+      setTimeout(() => showMapScreen(), 800);
+    } else {
+      // Show reward
+      setTimeout(() => showRewardScreen(), 800);
+    }
+  } else {
+    showLog('💀 战斗失败...');
+    setTimeout(() => showMapScreen(), 800);
+  }
+}
+
+function showFloatDmg(text, type) {
+  const area = document.getElementById('battle-area');
+  const el = document.createElement('div');
+  el.className = `float-dmg ${type}`;
+  el.textContent = text;
+  el.style.left = (30 + Math.random() * 40) + '%';
+  el.style.top = (20 + Math.random() * 20) + '%';
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+function showLog(text) {
+  const log = document.getElementById('battle-log');
+  log.textContent = text;
+  log.style.opacity = 1;
+  clearTimeout(log._timeout);
+  log._timeout = setTimeout(() => { log.style.opacity = 0; }, 2000);
+}
+
+// ==========================================
+// REWARD SCREEN
+// ==========================================
+function showRewardScreen() {
+  const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+  const used = new Set(G.deck.map(w=>w.en).concat(G.mastered.map(w=>w.en)));
+  const available = pool.filter(w => !used.has(w.en));
+  const picks = shuffle([...available]).slice(0, 5);
+  
+  const panel = document.getElementById('reward-panel');
+  panel.innerHTML = `
+    <div class="reward-title">🎁 战利品</div>
+    <div class="reward-info">选择 0~2 张单词卡加入牌库（当前牌库: ${G.deck.length} 张）</div>
+    <div class="reward-cards" id="reward-cards"></div>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted)" id="reward-sel-info">已选: 0/2</div>
+    <div style="margin-top:16px">
+      <button class="pixel-btn green" onclick="confirmReward()">确认选择</button>
+    </div>
+  `;
+  
+  const container = document.getElementById('reward-cards');
+  picks.forEach(w => {
+    const card = document.createElement('div');
+    card.className = 'reward-card';
+    card.innerHTML = `<div class="word">${w.en}</div><div class="meaning">${w.cn}</div>`;
+    card.onclick = () => toggleRewardCard(card, w);
+    container.appendChild(card);
+  });
+  
+  window._rewardPicks = [];
+  window._rewardWords = picks;
+  showScreen('reward-screen');
+}
+
+function toggleRewardCard(card, word) {
+  const idx = window._rewardPicks.findIndex(w => w.en === word.en);
+  if (idx >= 0) {
+    window._rewardPicks.splice(idx, 1);
+    card.classList.remove('selected');
+  } else if (window._rewardPicks.length < 2) {
+    window._rewardPicks.push(word);
+    card.classList.add('selected');
+  }
+  document.getElementById('reward-sel-info').textContent = `已选: ${window._rewardPicks.length}/2`;
+}
+
+function confirmReward() {
+  window._rewardPicks.forEach(w => G.deck.push(w));
+  showMapScreen();
+}
+
+// ==========================================
+// REST SCREEN
+// ==========================================
+function showRestScreen() {
+  renderHud('rest-hud');
+  document.getElementById('deck-view').classList.remove('show');
+  document.getElementById('master-view').classList.remove('show');
+  document.getElementById('master-confirm').classList.remove('show');
+
+  // Show mastered panel if any
+  const mp = document.getElementById('mastered-panel');
+  if (G.mastered.length > 0) {
+    mp.classList.add('show');
+    document.getElementById('mastered-list').innerHTML = 
+      G.mastered.map(w => `<span class="mastered-word">${w.en} ${w.cn}</span>`).join('');
+  } else {
+    mp.classList.remove('show');
+  }
+
+  // Update heal button state
+  renderHealButton();
+
+  // Show pending quiz info
+  renderPendingQuizInfo();
+
+  showScreen('rest-screen');
+
+  // If there are pending mastered words from previous rest, auto-trigger quiz
+  if (G.pendingMaster.length > 0) {
+    setTimeout(() => startQuiz(0), 500);
+  }
+}
+
+function renderHealButton() {
+  const opts = document.querySelectorAll('.rest-option');
+  const healBtn = opts[0]; // first option is heal
+  if (G.restUsed) {
+    healBtn.style.opacity = '0.35';
+    healBtn.style.cursor = 'not-allowed';
+    healBtn.style.borderColor = '#222';
+    healBtn.querySelector('.label').textContent = '已回复过';
+  } else {
+    healBtn.style.opacity = '1';
+    healBtn.style.cursor = 'pointer';
+    healBtn.style.borderColor = '#3a506b';
+    healBtn.querySelector('.label').textContent = '回复 30% 生命';
+  }
+}
+
+function renderPendingQuizInfo() {
+  let infoEl = document.getElementById('pending-quiz-info');
+  if (!infoEl) {
+    infoEl = document.createElement('div');
+    infoEl.id = 'pending-quiz-info';
+    const restArea = document.querySelector('.rest-area');
+    restArea.insertBefore(infoEl, restArea.children[2]);
+  }
+  if (G.pendingMaster.length > 0) {
+    infoEl.style.cssText = 'text-align:center;padding:10px;margin:0 0 12px;background:#2a1a3e;border:2px solid #6a3093;font-size:13px;color:#c39bd3;';
+    infoEl.innerHTML = `📝 有 <b>${G.pendingMaster.length}</b> 个待考核单词（上次休息时掌握）<br><span style="font-size:11px;color:#888">即将开始考核，请做好准备...</span>`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+}
+
+function restHeal() {
+  if (G.restUsed) return;
+  const heal = Math.floor(G.maxHp * 0.3);
+  G.hp = Math.min(G.maxHp, G.hp + heal);
+  G.restUsed = true;
+  showLog(`❤️ 回复 ${heal} 点生命`);
+  renderHud('rest-hud');
+  renderHealButton();
+}
+
+function toggleDeckView() {
+  const dv = document.getElementById('deck-view');
+  const mv = document.getElementById('master-view');
+  mv.classList.remove('show');
+  document.getElementById('master-confirm').classList.remove('show');
+  
+  dv.classList.toggle('show');
+  if (dv.classList.contains('show')) {
+    dv.innerHTML = G.deck.map(w => 
+      `<div class="deck-card"><b>${w.en}</b><br><span style="color:var(--muted);font-size:11px">${w.cn}</span></div>`
+    ).join('');
+  }
+}
+
+function toggleMasterView() {
+  const mv = document.getElementById('master-view');
+  const dv = document.getElementById('deck-view');
+  dv.classList.remove('show');
+  
+  mv.classList.toggle('show');
+  if (mv.classList.contains('show')) {
+    window._masterSelected = [];
+    mv.innerHTML = `
+      <div style="width:100%;text-align:center;margin-bottom:8px;font-size:13px;color:var(--gold)">选择你已掌握的单词（将暂时移出牌库，待下次休息时考核）</div>
+      ${G.deck.map((w,i) => 
+        `<div class="deck-card" data-idx="${i}" onclick="toggleMasterWord(this,${i})"><b>${w.en}</b><br><span style="color:var(--muted);font-size:11px">${w.cn}</span></div>`
+      ).join('')}
+    `;
+    document.getElementById('master-confirm').classList.add('show');
+    document.getElementById('master-count').textContent = '0';
+  } else {
+    document.getElementById('master-confirm').classList.remove('show');
+  }
+}
+
+function toggleMasterWord(card, idx) {
+  const i = window._masterSelected.indexOf(idx);
+  if (i >= 0) {
+    window._masterSelected.splice(i, 1);
+    card.classList.remove('selected');
+  } else {
+    window._masterSelected.push(idx);
+    card.classList.add('selected');
+  }
+  document.getElementById('master-count').textContent = window._masterSelected.length;
+}
+
+function confirmMaster() {
+  if (!window._masterSelected || window._masterSelected.length === 0) return;
+  
+  const words = window._masterSelected.sort((a,b) => b-a).map(i => G.deck[i]);
+  
+  // Remove from deck
+  window._masterSelected.sort((a,b) => b-a).forEach(i => G.deck.splice(i, 1));
+  
+  // Add to pending
+  G.pendingMaster.push(...words);
+  
+  // Add temp buffs
+  words.forEach(w => {
+    G.tempBuffs.push({type:'atk', value: 3, word: w.en});
+  });
+  
+  G.atk += words.length * 3;
+  
+  window._masterSelected = [];
+  toggleMasterView();
+  showLog(`🧠 掌握了 ${words.length} 个单词，攻击力 +${words.length * 3}`);
+  renderHud('rest-hud');
+}
+
+function leaveRest() {
+  showMapScreen();
+}
+
+// ==========================================
+// QUIZ SYSTEM
+// ==========================================
+function startQuiz(idx) {
+  if (idx >= G.pendingMaster.length) {
+    G.pendingMaster = [];
+    window._quizType = undefined; // reset for next session
+    // Hide the pending quiz info
+    const infoEl = document.getElementById('pending-quiz-info');
+    if (infoEl) infoEl.style.display = 'none';
+    // Stay at rest screen so player can use remaining options
+    showRestScreen();
+    return;
+  }
+
+  // Lock quiz type for entire session (pick once on first call)
+  if (window._quizType === undefined) {
+    window._quizType = Math.random() < 0.5 ? 'spell' : 'choice';
+  }
+
+  const word = G.pendingMaster[idx];
+  const overlay = document.getElementById('quiz-overlay');
+  overlay.classList.add('show');
+  const panel = document.getElementById('quiz-panel');
+
+  if (window._quizType === 'spell') {
+    // Give Chinese, type English
+    panel.innerHTML = `
+      <div class="quiz-title">📝 拼写考核 (${idx+1}/${G.pendingMaster.length})</div>
+      <div class="quiz-hint">根据中文释义，拼写出英文单词，按回车确认</div>
+      <div style="font-size:24px;color:var(--gold);margin:12px 0">${word.cn}</div>
+      <input class="quiz-input" id="quiz-input" placeholder="输入英文单词..." autocomplete="off" autofocus>
+      <div class="quiz-result" id="quiz-result"></div>
+    `;
+    setTimeout(() => {
+      const inp = document.getElementById('quiz-input');
+      if (inp) {
+        inp.focus();
+        inp.addEventListener('keydown', function handler(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            inp.removeEventListener('keydown', handler);
+            checkSpellQuiz(idx);
+          }
+        });
+      }
+    }, 100);
+  } else {
+    // 4-choice
+    const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+    const wrongs = shuffle(pool.filter(w => w.en !== word.en)).slice(0, 3);
+    const options = shuffle([word, ...wrongs]);
+
+    panel.innerHTML = `
+      <div class="quiz-title">🎯 释义考核 (${idx+1}/${G.pendingMaster.length})</div>
+      <div class="quiz-hint">选择 "<b>${word.en}</b>" 的正确释义</div>
+      <div class="quiz-options" id="quiz-options">
+        ${options.map(o => `<div class="quiz-opt" onclick="checkChoiceQuiz(${idx},'${o.en}','${word.en}',this)">${o.cn}</div>`).join('')}
+      </div>
+      <div class="quiz-result" id="quiz-result"></div>
+    `;
+  }
+}
+
+function checkSpellQuiz(idx) {
+  const input = document.getElementById('quiz-input').value.trim().toLowerCase();
+  const word = G.pendingMaster[idx];
+  const result = document.getElementById('quiz-result');
+  
+  if (input === word.en.toLowerCase()) {
+    result.innerHTML = '<span style="color:var(--green)">✅ 正确! 已永久掌握</span>';
+    passQuiz(idx);
+  } else {
+    result.innerHTML = `<span style="color:var(--accent)">❌ 错误! 答案: ${word.en}</span>`;
+    failQuiz(idx);
+  }
+  setTimeout(() => {
+    document.getElementById('quiz-overlay').classList.remove('show');
+    startQuiz(idx + 1);
+  }, 1500);
+}
+
+function checkChoiceQuiz(idx, selected, correct, el) {
+  const result = document.getElementById('quiz-result');
+  const opts = document.querySelectorAll('.quiz-opt');
+  opts.forEach(o => o.style.pointerEvents = 'none');
+  
+  if (selected === correct) {
+    el.classList.add('correct');
+    result.innerHTML = '<span style="color:var(--green)">✅ 正确! 已永久掌握</span>';
+    passQuiz(idx);
+  } else {
+    el.classList.add('wrong');
+    opts.forEach(o => { if (o.textContent === getWordCn(correct)) o.classList.add('correct'); });
+    result.innerHTML = `<span style="color:var(--accent)">❌ 错误!</span>`;
+    failQuiz(idx);
+  }
+  
+  function getWordCn(en) {
+    const w = G.pendingMaster[idx];
+    return w.cn;
+  }
+  
+  setTimeout(() => {
+    document.getElementById('quiz-overlay').classList.remove('show');
+    startQuiz(idx + 1);
+  }, 1500);
+}
+
+function passQuiz(idx) {
+  const word = G.pendingMaster[idx];
+  G.mastered.push(word);
+  // Convert temp buff to perm
+  const tempIdx = G.tempBuffs.findIndex(b => b.word === word.en);
+  if (tempIdx >= 0) {
+    G.permBuffs.push(G.tempBuffs[tempIdx]);
+    G.tempBuffs.splice(tempIdx, 1);
+  } else {
+    // Remove temp atk buff that was already applied
+    G.permBuffs.push({type:'atk', value: 3, word: word.en});
+  }
+  G.score += 20;
+}
+
+function failQuiz(idx) {
+  const word = G.pendingMaster[idx];
+  // Return to deck
+  G.deck.push(word);
+  // Remove temp buff
+  const tempIdx = G.tempBuffs.findIndex(b => b.word === word.en);
+  if (tempIdx >= 0) {
+    G.atk -= G.tempBuffs[tempIdx].value;
+    G.tempBuffs.splice(tempIdx, 1);
+  }
+  // Penalty
+  G.hp = Math.max(1, G.hp - 10);
+  showLog('💔 考核失败，-10 生命');
+}
+
+// ==========================================
+// EVENT SCREEN
+// ==========================================
+function showEventScreen() {
+  renderHud('event-hud');
+  const event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+  const panel = document.getElementById('event-panel');
+  
+  let choicesHtml = '';
+  
+  switch(event.type) {
+    case 'scholar': {
+      // Fill-in-the-blank sentence quiz
+      const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+      const word = pool[Math.floor(Math.random() * pool.length)];
+      const wrongs = shuffle(pool.filter(w => w.en !== word.en)).slice(0, 3);
+      const options = shuffle([word, ...wrongs]);
+      const sentences = [
+        `The teacher asked us to _____ the new vocabulary.`,
+        `She tried to _____ the meaning of the text.`,
+        `We need to _____ our understanding of the topic.`,
+        `He showed great _____ in his studies.`,
+      ];
+      const sentence = sentences[Math.floor(Math.random() * sentences.length)];
+      
+      panel.innerHTML = `
+        <div class="event-icon">${event.emoji}</div>
+        <div class="event-title">${event.name}</div>
+        <div class="event-desc">"${sentence}"<br><br>选择正确的单词填入空格</div>
+        <div class="event-choices">
+          ${options.map(o => 
+            `<div class="event-choice" onclick="scholarAnswer('${o.en}','${word.en}',this,${o.en===word.en})">${o.en} — ${o.cn}</div>`
+          ).join('')}
+        </div>
+      `;
+      break;
+    }
+    case 'fountain': {
+      const roots = ['-tion','-ment','-able','-ous','-ive','-ing','-ed','-ly','-er','-al'];
+      const picked = shuffle(roots).slice(0, 3);
+      panel.innerHTML = `
+        <div class="event-icon">${event.emoji}</div>
+        <div class="event-title">${event.name}</div>
+        <div class="event-desc">${event.desc}</div>
+        <div class="event-choices">
+          ${picked.map(r => 
+            `<div class="event-choice" onclick="fountainPick('${r}',this)">${r} 词根</div>`
+          ).join('')}
+        </div>
+      `;
+      break;
+    }
+    case 'gamble': {
+      const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+      const words = shuffle(pool.filter(w => !G.deck.some(d=>d.en===w.en))).slice(0, 3);
+      window._eventWords = words;
+      panel.innerHTML = `
+        <div class="event-icon">${event.emoji}</div>
+        <div class="event-title">${event.name}</div>
+        <div class="event-desc">${event.desc}</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin:12px 0">
+          ${words.map(w => `<div style="padding:8px 12px;background:#16213e;border:2px solid #3a506b;font-size:13px">${w.en}<br><span style="color:var(--muted);font-size:11px">${w.cn}</span></div>`).join('')}
+        </div>
+        <div style="font-size:12px;color:var(--accent);margin-bottom:12px">10秒记忆时间...</div>
+        <div class="event-choices">
+          <div class="event-choice" onclick="gambleStart(window._eventWords)">开始挑战</div>
+          <div class="event-choice" onclick="closeEvent()">跳过</div>
+        </div>
+      `;
+      break;
+    }
+    case 'potion': {
+      panel.innerHTML = `
+        <div class="event-icon">${event.emoji}</div>
+        <div class="event-title">${event.name}</div>
+        <div class="event-desc">${event.desc}</div>
+        <div class="event-choices">
+          <div class="event-choice" onclick="drinkPotion()">饮用药水（移除2个随机单词，-10%生命）</div>
+          <div class="event-choice" onclick="closeEvent()">离开</div>
+        </div>
+      `;
+      break;
+    }
+    case 'merchant': {
+      const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+      const words = shuffle(pool.filter(w => !G.deck.some(d=>d.en===w.en))).slice(0, 3);
+      window._eventWords = words;
+      panel.innerHTML = `
+        <div class="event-icon">${event.emoji}</div>
+        <div class="event-title">${event.name}</div>
+        <div class="event-desc">${event.desc}</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin:12px 0">
+          ${words.map(w => `<div style="padding:8px 12px;background:#16213e;border:2px solid var(--gold);font-size:13px">${w.en}<br><span style="color:var(--muted);font-size:11px">${w.cn}</span></div>`).join('')}
+        </div>
+        <div class="event-choices">
+          <div class="event-choice" onclick="merchantDeal(window._eventWords)">接受交易（获得3张卡，接受1次考核）</div>
+          <div class="event-choice" onclick="closeEvent()">婉拒</div>
+        </div>
+      `;
+      break;
+    }
+  }
+  
+  showScreen('event-screen');
+}
+
+function scholarAnswer(selected, correct, el, isCorrect) {
+  const choices = document.querySelectorAll('.event-choice');
+  choices.forEach(c => c.style.pointerEvents = 'none');
+  
+  if (isCorrect) {
+    el.style.borderColor = 'var(--green)';
+    el.style.background = '#1a3a2a';
+    G.hp = G.maxHp; // Full heal
+    showLog('🎉 全部回复!');
+  } else {
+    el.style.borderColor = 'var(--accent)';
+    el.style.background = '#3a1a1a';
+    showLog('答错了，没有惩罚');
+  }
+  setTimeout(() => closeEvent(), 1500);
+}
+
+function fountainPick(root, el) {
+  const choices = document.querySelectorAll('.event-choice');
+  choices.forEach(c => c.style.pointerEvents = 'none');
+  el.style.borderColor = 'var(--blue)';
+  el.style.background = '#1a2a3a';
+  
+  // Apply buff: words ending with this root get +20% damage
+  G.tempBuffs.push({type:'rootBuff', root: root, value: 0.2});
+  showLog(`⛲ 获得词根 ${root} 的祝福`);
+  setTimeout(() => closeEvent(), 1200);
+}
+
+function gambleStart(words) {
+  const panel = document.getElementById('event-panel');
+  panel.innerHTML = `
+    <div class="event-icon">🎰</div>
+    <div class="event-title">记忆之赌</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin:16px 0">
+      ${words.map(w => `<div style="padding:12px 16px;background:#16213e;border:2px solid #3a506b;font-size:14px">${w.en}<br><span style="color:var(--muted);font-size:12px">${w.cn}</span></div>`).join('')}
+    </div>
+    <div id="gamble-timer" style="font-size:20px;color:var(--gold)">10</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">记住这些单词...</div>
+  `;
+  
+  let time = 10;
+  const timer = setInterval(() => {
+    time--;
+    document.getElementById('gamble-timer').textContent = time;
+    if (time <= 0) {
+      clearInterval(timer);
+      // Hide and quiz
+      const word = words[Math.floor(Math.random() * words.length)];
+      panel.innerHTML = `
+        <div class="event-icon">🎰</div>
+        <div class="event-title">拼出其中一个单词!</div>
+        <div style="font-size:16px;color:var(--gold);margin:12px 0">${word.cn}</div>
+        <input class="quiz-input" id="gamble-input" placeholder="输入英文..." autocomplete="off" autofocus>
+        <div id="gamble-result" style="margin-top:8px;font-size:14px"></div>
+        <button class="pixel-btn green" style="margin-top:12px" onclick="checkGamble('${word.en}')">确认</button>
+      `;
+      setTimeout(() => document.getElementById('gamble-input').focus(), 100);
+    }
+  }, 1000);
+}
+
+function checkGamble(correct) {
+  const input = document.getElementById('gamble-input').value.trim().toLowerCase();
+  const result = document.getElementById('gamble-result');
+  
+  if (input === correct.toLowerCase()) {
+    result.innerHTML = '<span style="color:var(--green)">✅ 正确! 获得奖励!</span>';
+    G.atk += 5;
+    G.score += 30;
+    showLog('🎰 记忆之赌胜利! 攻击力 +5');
+  } else {
+    result.innerHTML = `<span style="color:var(--accent)">❌ 错误! 答案: ${correct}</span>`;
+    G.hp = Math.max(1, G.hp - 20);
+    showLog('🎰 记忆之赌失败! -20 生命');
+  }
+  renderHud('event-hud');
+  setTimeout(() => closeEvent(), 1500);
+}
+
+function drinkPotion() {
+  if (G.deck.length >= 2) {
+    const removed = [];
+    for (let i = 0; i < 2; i++) {
+      const idx = Math.floor(Math.random() * G.deck.length);
+      removed.push(G.deck.splice(idx, 1)[0]);
+    }
+    const hpLoss = Math.floor(G.maxHp * 0.1);
+    G.hp = Math.max(1, G.hp - hpLoss);
+    showLog(`🧪 移除了 ${removed.map(w=>w.en).join(', ')}，-${hpLoss} 生命`);
+  } else {
+    showLog('牌库不足，无法饮用');
+  }
+  renderHud('event-hud');
+  setTimeout(() => closeEvent(), 1200);
+}
+
+function merchantDeal(words) {
+  words.forEach(w => G.deck.push(w));
+  showLog(`🧳 获得 ${words.length} 张单词卡，需接受考核`);
+
+  // Quiz the first word immediately
+  setTimeout(() => {
+    G.pendingMaster = [words[0]];
+    startMerchantQuiz(words[0], words.slice(1));
+  }, 800);
+}
+
+function startMerchantQuiz(word, extraWords) {
+  const overlay = document.getElementById('quiz-overlay');
+  overlay.classList.add('show');
+  const panel = document.getElementById('quiz-panel');
+  
+  const pool = WORD_POOLS[G.floorWordLevel] || WORD_POOLS[1];
+  const wrongs = shuffle(pool.filter(w => w.en !== word.en)).slice(0, 3);
+  const options = shuffle([word, ...wrongs]);
+  
+  panel.innerHTML = `
+    <div class="quiz-title">🧳 商人的考核</div>
+    <div class="quiz-hint">选择 "<b>${word.en}</b>" 的正确释义</div>
+    <div class="quiz-options">
+      ${options.map(o => `<div class="quiz-opt" onclick="merchantQuizAnswer('${o.en}','${word.en}',this)">${o.cn}</div>`).join('')}
+    </div>
+    <div class="quiz-result" id="quiz-result"></div>
+  `;
+}
+
+function merchantQuizAnswer(selected, correct, el) {
+  const opts = document.querySelectorAll('.quiz-opt');
+  opts.forEach(o => o.style.pointerEvents = 'none');
+  
+  if (selected === correct) {
+    el.classList.add('correct');
+    document.getElementById('quiz-result').innerHTML = '<span style="color:var(--green)">✅ 考核通过!</span>';
+    G.score += 20;
+  } else {
+    el.classList.add('wrong');
+    document.getElementById('quiz-result').innerHTML = '<span style="color:var(--accent)">❌ 考核失败!</span>';
+    G.hp = Math.max(1, G.hp - 15);
+  }
+  
+  G.pendingMaster = [];
+  setTimeout(() => {
+    document.getElementById('quiz-overlay').classList.remove('show');
+    closeEvent();
+  }, 1500);
+}
+
+function closeEvent() {
+  showMapScreen();
+}
+
+// ==========================================
+// GAME OVER / VICTORY
+// ==========================================
+function gameOver() {
+  document.getElementById('go-stats').innerHTML = `
+    层数: ${G.floor}<br>
+    得分: ${G.score}<br>
+    掌握单词: ${G.mastered.length}<br>
+    完美连线: ${G.perfectMatches}<br>
+    遇到单词: ${G.wordsEncountered}
+  `;
+  showScreen('gameover-screen');
+}
+
+function showVictory() {
+  document.getElementById('vic-stats').innerHTML = `
+    最终得分: ${G.score}<br>
+    掌握单词: ${G.mastered.length}<br>
+    完美连线: ${G.perfectMatches}<br>
+    遇到单词: ${G.wordsEncountered}<br>
+    剩余生命: ${G.hp}/${G.maxHp}
+  `;
+  showScreen('victory-screen');
+}
+
+// ==========================================
+// DECK BROWSE
+// ==========================================
+function openDeckBrowse() {
+  const grid = document.getElementById('deck-browse-grid');
+  grid.innerHTML = G.deck.map(w => 
+    `<div class="deck-browse-card"><div class="en">${w.en}</div><div class="cn">${w.cn}</div></div>`
+  ).join('');
+  document.getElementById('deck-browse').classList.add('show');
+}
+
+function closeDeckBrowse() {
+  document.getElementById('deck-browse').classList.remove('show');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeDeckBrowse();
+    document.getElementById('quiz-overlay').classList.remove('show');
+  }
+  if (e.key === 'd' || e.key === 'D') {
+    if (document.getElementById('map-screen').classList.contains('active')) {
+      openDeckBrowse();
+    }
+  }
+});
+
+// Init
+</script>
+</body>
+</html>
