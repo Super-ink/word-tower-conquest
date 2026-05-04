@@ -767,6 +767,18 @@ canvas { display: none; }
     background: #1e2a4a;
   }
 
+  /* Endless Choice */
+  .endless-panel {
+    padding: 20px 14px;
+    max-width: 100%;
+    margin: 0 12px;
+  }
+  .endless-title { font-size: 20px; }
+  .endless-sub { font-size: 13px; }
+  .endless-choice { padding: 14px; min-height: 52px; }
+  .endless-choice .icon { font-size: 24px; }
+  .endless-choice .label { font-size: 15px; }
+
   /* Game Over / Victory */
   .go-panel, .vic-panel { padding: 24px 16px; }
   .go-title, .vic-title { font-size: 26px; }
@@ -820,6 +832,50 @@ canvas { display: none; }
   .map-node { width: 44px; height: 44px; font-size: 18px; }
   .map-grid { gap: 8px; }
   .map-row { gap: 8px; }
+}
+
+/* Endless Choice */
+.endless-panel {
+  background: #1e2a4a;
+  border: 3px solid var(--gold);
+  padding: 32px;
+  max-width: 480px;
+  text-align: center;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.endless-title { font-size: 24px; color: var(--gold); margin-bottom: 12px; }
+.endless-sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+.endless-choices { display: flex; flex-direction: column; gap: 12px; }
+.endless-choice {
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.endless-choice .icon { font-size: 28px; }
+.endless-choice .label { font-size: 16px; font-weight: bold; }
+.endless-choice .desc { font-size: 12px; color: var(--muted); }
+.endless-choice.continue {
+  background: #1a2a1a;
+  border: 3px solid var(--green);
+}
+.endless-choice.continue:hover, .endless-choice.continue:active {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(78,204,163,0.3);
+}
+.endless-choice.end {
+  background: #2a1a1a;
+  border: 3px solid var(--accent);
+}
+.endless-choice.end:hover, .endless-choice.end:active {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(233,69,96,0.3);
 }
 
 /* Transition effect */
@@ -1026,6 +1082,11 @@ canvas { display: none; }
     <div class="vic-stats" id="vic-stats"></div>
     <button class="pixel-btn gold" onclick="startGame()">新的征程</button>
   </div>
+</div>
+
+<!-- Endless Choice Overlay -->
+<div class="quiz-overlay" id="endless-overlay">
+  <div class="endless-panel" id="endless-panel"></div>
 </div>
 
 <script>
@@ -2105,6 +2166,8 @@ function initState() {
     bonusTime: 0,
     extraErrorForgive: 0,
     floorWordLevel: 1,
+    endless: false,        // endless mode flag
+    endlessBossIdx: 0,     // cycling boss index for endless
   };
   // Generate initial deck
   generateDeck(20);
@@ -2176,7 +2239,7 @@ function renderHud(containerId) {
         <div class="hp-bar"><div class="fill" style="width:${(G.hp/G.maxHp*100)}%"></div><div class="bar-text">${G.hp}/${G.maxHp}</div></div>
       </div>
       <div class="hud-item"><span class="hud-icon">⚔️</span> ${G.atk}</div>
-      <div class="hud-item"><span class="hud-icon">🏰</span> 第${G.floor}层</div>
+      <div class="hud-item"><span class="hud-icon">🏰</span> 第${G.floor}层${G.endless?' ♾️':''}</div>
     </div>
     <div class="hud-right">
       <div class="hud-item"><span class="hud-icon">📚</span> 牌库:${G.deck.length}</div>
@@ -2196,7 +2259,9 @@ function startGame() {
 
 function showMapScreen() {
   renderHud('map-hud');
-  document.getElementById('map-title').textContent = `第${G.floor}层 · ${['四级词汇','六级词汇','考研词汇'][G.floor-1]||'终极词汇'}`;
+  document.getElementById('map-title').textContent = G.endless
+    ? `第${G.floor}层 · 无尽模式`
+    : `第${G.floor}层 · ${['四级词汇','六级词汇','考研词汇'][G.floor-1]||'终极词汇'}`;
   renderMap();
   showScreen('map-screen');
 }
@@ -2258,11 +2323,15 @@ let battleState = {};
 function startBattle(isBoss) {
   const enemies = isBoss ? BOSSES : ENEMIES;
   const enemy = isBoss ? 
-    BOSSES[Math.min(G.floor - 1, BOSSES.length - 1)] :
+    (G.endless ?
+      { ...BOSSES[G.endlessBossIdx % BOSSES.length], name: BOSSES[G.endlessBossIdx % BOSSES.length].name + '·改' } :
+      BOSSES[Math.min(G.floor - 1, BOSSES.length - 1)]) :
     ENEMIES[Math.floor(Math.random() * ENEMIES.length)];
   
-  // Scale enemy
-  const scaleFactor = 1 + (G.floor - 1) * 0.3;
+  // Scale enemy - harder in endless
+  const scaleFactor = G.endless
+    ? 1 + (G.floor - 1) * 0.5
+    : 1 + (G.floor - 1) * 0.3;
   
   battleState = {
     enemy: {
@@ -2554,12 +2623,14 @@ function endBattle(won) {
     
     if (battleState.isBoss) {
       // Advance floor
-      if (G.floor >= 3) {
-        showVictory();
+      if (G.floor >= 3 && !G.endless) {
+        // Offer endless mode choice
+        setTimeout(() => showEndlessChoice(), 800);
         return;
       }
       G.floor++;
-      G.floorWordLevel = Math.min(G.floor, 3);
+      G.floorWordLevel = 3; // lock to hardest pool in endless
+      if (G.endless) G.endlessBossIdx++;
       generateDeck(5);
       generateMap();
       setTimeout(() => showMapScreen(), 800);
@@ -3204,8 +3275,59 @@ function gameOver() {
   showScreen('gameover-screen');
 }
 
+// ==========================================
+// ENDLESS MODE
+// ==========================================
+function showEndlessChoice() {
+  const panel = document.getElementById('endless-panel');
+  panel.innerHTML = `
+    <div class="endless-title">🏆 三层通关！</div>
+    <div class="endless-sub">
+      你已征服四级、六级、考研词汇！<br>
+      当前得分: ${G.score} · 掌握单词: ${G.mastered.length}<br>
+      剩余生命: ${G.hp}/${G.maxHp}
+    </div>
+    <div class="endless-choices">
+      <div class="endless-choice continue" onclick="enterEndless()">
+        <div class="icon">♾️</div>
+        <div class="label">进入无尽模式</div>
+        <div class="desc">敌人持续变强，考研词库循环，看你能走多远</div>
+      </div>
+      <div class="endless-choice end" onclick="finishRun()">
+        <div class="icon">🏆</div>
+        <div class="label">光荣收兵</div>
+        <div class="desc">以征服者的身份结束征程</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('endless-overlay').classList.add('show');
+}
+
+function enterEndless() {
+  document.getElementById('endless-overlay').classList.remove('show');
+  G.endless = true;
+  G.floor++;
+  G.floorWordLevel = 3; // lock to hardest pool
+  G.endlessBossIdx = 0;
+  generateDeck(5);
+  generateMap();
+  showMapScreen();
+}
+
+function finishRun() {
+  document.getElementById('endless-overlay').classList.remove('show');
+  showVictory();
+}
+
 function showVictory() {
+  const vicTitle = document.querySelector('.vic-title');
+  if (G.endless) {
+    vicTitle.textContent = '♾️ 无尽征程结束';
+  } else {
+    vicTitle.textContent = '🏆 征服成功!';
+  }
   document.getElementById('vic-stats').innerHTML = `
+    ${G.endless ? `到达层数: 第${G.floor}层<br>` : ''}
     最终得分: ${G.score}<br>
     掌握单词: ${G.mastered.length}<br>
     完美连线: ${G.perfectMatches}<br>
@@ -3235,6 +3357,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeDeckBrowse();
     document.getElementById('quiz-overlay').classList.remove('show');
+    document.getElementById('endless-overlay').classList.remove('show');
   }
   if (e.key === 'd' || e.key === 'D') {
     if (document.getElementById('map-screen').classList.contains('active')) {
